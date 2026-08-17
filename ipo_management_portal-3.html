@@ -1,0 +1,2574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPO Management Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#0f1b2d;
+  --navy-2:#16263f;
+  --navy-3:#1e3252;
+  --gold:#c8963e;
+  --gold-light:#e0b46a;
+  --teal:#2f8f7f;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --border:#e2e6ed;
+  --text:#1c2733;
+  --text-dim:#5c6b7a;
+  --danger:#c0392b;
+  --warn:#c8963e;
+  --ok:#2f8f7f;
+  --radius:8px;
+  --shadow:0 1px 3px rgba(16,32,55,.08),0 1px 2px rgba(16,32,55,.06);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  display:flex;
+  min-height:100vh;
+}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:#c9d2dc;border-radius:6px;}
+
+/* Sidebar */
+#sidebar{
+  width:238px;
+  background:linear-gradient(180deg,var(--navy) 0%, var(--navy-2) 100%);
+  color:#dbe4ef;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  top:0;left:0;bottom:0;
+  z-index:200;
+  transition:transform .25s ease;
+}
+#sidebar .brand{
+  padding:20px 18px 14px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+#sidebar .brand .title{font-size:15px;font-weight:700;letter-spacing:.4px;color:#fff;}
+#sidebar .brand .sub{font-size:11px;color:var(--gold-light);margin-top:3px;letter-spacing:.5px;text-transform:uppercase;}
+#sidebar nav{flex:1;overflow-y:auto;padding:10px 0;}
+#sidebar .nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 18px;
+  font-size:13px;
+  color:#b7c4d4;
+  cursor:pointer;
+  border-left:3px solid transparent;
+  white-space:nowrap;
+}
+#sidebar .nav-item .ico{width:16px;text-align:center;font-size:13px;}
+#sidebar .nav-item:hover{background:rgba(255,255,255,.05);color:#fff;}
+#sidebar .nav-item.active{background:rgba(200,150,62,.14);color:#fff;border-left-color:var(--gold);font-weight:600;}
+#sidebar .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;}
+#sidebar .foot{padding:12px 18px;font-size:10.5px;color:#7688a0;border-top:1px solid rgba(255,255,255,.08);}
+
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:190;}
+
+/* Main */
+#main{margin-left:238px;flex:1;min-width:0;display:flex;flex-direction:column;}
+#topbar{
+  height:56px;background:var(--card);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:14px;position:sticky;top:0;z-index:100;
+}
+#menuToggle{display:none;background:none;border:none;font-size:20px;color:var(--navy);padding:4px 8px;border-radius:6px;}
+#topbar .pageTitle{font-size:16px;font-weight:700;color:var(--navy);}
+#topbar .spacer{flex:1;}
+#topbar .quickBtn{
+  background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12.5px;font-weight:600;
+}
+#topbar .quickBtn.secondary{background:var(--card);color:var(--navy);border:1px solid var(--border);}
+#content{padding:20px 22px 60px;}
+
+/* Cards / KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-bottom:20px;}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
+.kpi-card .lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;font-weight:600;}
+.kpi-card .val{font-size:22px;font-weight:800;color:var(--navy);margin-top:6px;}
+.kpi-card .val.gold{color:var(--gold);}
+.kpi-card .val.danger{color:var(--danger);}
+.kpi-card .val.ok{color:var(--ok);}
+
+.section-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;}
+.section-card .sc-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.section-card .sc-head h3{margin:0;font-size:14px;color:var(--navy);font-weight:700;}
+.section-card .sc-body{padding:14px 16px;}
+.section-card .sc-head .spacer{flex:1;}
+
+/* Tables */
+.table-wrap{overflow-x:auto;}
+table.dt{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.dt th{
+  text-align:left;padding:9px 10px;background:#f8f9fb;color:var(--text-dim);
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+table.dt th:hover{color:var(--navy);}
+table.dt td{padding:9px 10px;border-bottom:1px solid #eef1f5;white-space:nowrap;}
+table.dt tr:hover td{background:#fbfbfd;}
+table.dt tr.clickable{cursor:pointer;}
+.empty-row td{text-align:center;color:var(--text-dim);padding:26px;font-style:italic;}
+
+/* badges */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.2px;}
+.badge.gray{background:#eceff3;color:#5c6b7a;}
+.badge.blue{background:#e5edfb;color:#2757a8;}
+.badge.gold{background:#faf1de;color:#a2731c;}
+.badge.green{background:#e2f5ef;color:#1f7a63;}
+.badge.red{background:#fbe6e3;color:#a5301f;}
+.badge.purple{background:#efe6fb;color:#6b2fa8;}
+.badge.teal{background:#e0f3f0;color:#1c7f70;}
+
+/* forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+.form-grid.one{grid-template-columns:1fr;}
+.f-group{display:flex;flex-direction:column;gap:5px;}
+.f-group.span2{grid-column:1/-1;}
+.f-group label{font-size:11.5px;color:var(--text-dim);font-weight:600;}
+.f-group input,.f-group select,.f-group textarea{
+  border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:var(--text);
+}
+.f-group input:focus,.f-group select:focus,.f-group textarea:focus{outline:2px solid #2757a8;outline-offset:0;}
+.f-group textarea{resize:vertical;min-height:60px;}
+.checkbox-row{display:flex;align-items:center;gap:8px;}
+
+.btn{border:none;border-radius:6px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-gold{background:var(--gold);color:#fff;}
+.btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text);}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-sm{padding:5px 10px;font-size:11.5px;}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.link-btn{background:none;border:none;color:#2757a8;font-size:12px;font-weight:600;padding:2px 4px;}
+
+/* toolbar for lists */
+.list-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+.list-toolbar input[type=text],.list-toolbar select,.list-toolbar input[type=date]{
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12.5px;background:#fff;
+}
+.list-toolbar .spacer{flex:1;}
+.pagination{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:10px;font-size:12px;}
+.pagination button{border:1px solid var(--border);background:#fff;border-radius:5px;padding:4px 9px;}
+.pagination button[disabled]{opacity:.4;cursor:not-allowed;}
+
+/* modal */
+#modalOverlay{position:fixed;inset:0;background:rgba(15,27,45,.5);display:none;align-items:flex-start;justify-content:center;z-index:500;overflow-y:auto;padding:40px 16px;}
+#modalOverlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:10px;max-width:640px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-box.wide{max-width:920px;}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;}
+.modal-head h3{margin:0;font-size:15px;color:var(--navy);}
+.modal-head .x{margin-left:auto;background:none;border:none;font-size:18px;color:var(--text-dim);cursor:pointer;}
+.modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+
+/* toast */
+#toastWrap{position:fixed;bottom:20px;right:20px;z-index:800;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--navy);color:#fff;padding:11px 16px;border-radius:7px;font-size:12.5px;box-shadow:var(--shadow);max-width:320px;}
+.toast.warn{background:var(--warn);}
+.toast.danger{background:var(--danger);}
+.toast.ok{background:var(--ok);}
+
+/* capacity cell */
+.cap-cell{display:inline-block;padding:3px 8px;border-radius:5px;font-weight:700;font-size:11.5px;}
+.cap-avail{background:#e2f5ef;color:#1f7a63;}
+.cap-near{background:#faf1de;color:#a2731c;}
+.cap-full{background:#fbe0d3;color:#b1521a;}
+.cap-over{background:#fbe6e3;color:#a5301f;}
+
+.attn-list{display:flex;flex-direction:column;gap:8px;}
+.attn-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;border-left:4px solid var(--border);background:#fafbfc;font-size:12.5px;}
+.attn-item.high{border-left-color:var(--danger);}
+.attn-item.med{border-left-color:var(--warn);}
+.attn-item.low{border-left-color:#9fb2c2;}
+.attn-item .tag{font-size:9.5px;text-transform:uppercase;font-weight:800;letter-spacing:.4px;color:var(--text-dim);}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap;}
+.tabs button{background:none;border:none;padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--text-dim);border-bottom:2px solid transparent;}
+.tabs button.active{color:var(--navy);border-bottom-color:var(--gold);}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.cal-cell{min-height:76px;border:1px solid var(--border);border-radius:6px;padding:6px;font-size:11px;background:#fff;cursor:pointer;}
+.cal-cell.empty{background:transparent;border:none;cursor:default;}
+.cal-cell .dnum{font-weight:700;color:var(--navy);font-size:12px;}
+.cal-cell .bankline{display:flex;justify-content:space-between;margin-top:3px;}
+
+.small-muted{color:var(--text-dim);font-size:11.5px;}
+.hint{font-size:11px;color:var(--text-dim);margin-top:4px;}
+
+@media (max-width:900px){
+  #sidebar{transform:translateX(-100%);}
+  #sidebar.open{transform:translateX(0);}
+  #sidebar-overlay.open{display:block;}
+  #main{margin-left:0;}
+  #menuToggle{display:block;}
+  .form-grid{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div id="sidebar">
+  <div class="brand">
+    <div class="title">IPO Management Portal</div>
+    <div class="sub">Planning &amp; MIS</div>
+  </div>
+  <nav id="navList"></nav>
+  <div class="foot">Local data · IndexedDB<br>v1.0</div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <button id="menuToggle" onclick="openSidebar()">&#9776;</button>
+    <div class="pageTitle" id="pageTitle">Dashboard</div>
+    <div class="spacer"></div>
+    <span id="syncIndicator" class="badge gray" style="display:none;margin-right:4px;"></span>
+    <button class="quickBtn secondary" onclick="exportAllToExcel()">Export Excel</button>
+  </div>
+  <div id="content"></div>
+</div>
+
+<div id="modalOverlay">
+  <div class="modal-box" id="modalBox">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button class="x" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div id="toastWrap"></div>
+
+<script>
+/* =========================================================
+   IPO MANAGEMENT PORTAL
+   Single-file app. IndexedDB storage. No build step.
+========================================================= */
+
+const DB_NAME = 'ipoPortalDB';
+const DB_VERSION = 2; // bumped: v2 adds bankUpiIds store and drops the retired mandates store
+const STORES = {
+  clients: 'id', bankAccounts: 'id', ipos: 'id', ipoPlans: 'id',
+  plannedClients: 'id', applications: 'id', bankUpiIds: 'id',
+  auditLogs: 'id', settings: 'key'
+};
+let db;
+
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      Object.entries(STORES).forEach(([name, keyPath]) => {
+        if (!d.objectStoreNames.contains(name)) {
+          d.createObjectStore(name, { keyPath, autoIncrement: keyPath === 'id' });
+        }
+      });
+      // retired store from an earlier version of this app — safe to drop if present
+      if (d.objectStoreNames.contains('mandates')) {
+        d.deleteObjectStore('mandates');
+      }
+    };
+    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = (e) => reject(e.target.error || e);
+    req.onblocked = () => reject(new Error('Database upgrade blocked — please close this app in any other open tabs and reload.'));
+  });
+}
+function storeTx(name, mode='readonly'){ return db.transaction(name, mode).objectStore(name); }
+function getAll(name){ return new Promise((res,rej)=>{ const r=storeTx(name).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function getOne(name,id){ return new Promise((res,rej)=>{ const r=storeTx(name).get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function putRec(name,obj){ return new Promise((res,rej)=>{ const r=storeTx(name,'readwrite').put(obj); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function delRec(name,id){ return new Promise((res,rej)=>{ const r=storeTx(name,'readwrite').delete(id); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
+function clearStore(name){ return new Promise((res,rej)=>{ const r=storeTx(name,'readwrite').clear(); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
+
+// ---- App state ----
+const S = {
+  clients: [], bankAccounts: [], ipos: [], ipoPlans: [], plannedClients: [],
+  applications: [], bankUpiIds: [], auditLogs: [], settings: {},
+  view: 'dashboard', params: {}
+};
+
+async function loadAll(){
+  const [clients, bankAccounts, ipos, ipoPlans, plannedClients, applications, bankUpiIds, auditLogs, settingsArr] = await Promise.all([
+    getAll('clients'), getAll('bankAccounts'), getAll('ipos'), getAll('ipoPlans'),
+    getAll('plannedClients'), getAll('applications'), getAll('bankUpiIds'), getAll('auditLogs'), getAll('settings')
+  ]);
+  S.clients = clients; S.bankAccounts = bankAccounts; S.ipos = ipos; S.ipoPlans = ipoPlans;
+  S.plannedClients = plannedClients; S.applications = applications; S.bankUpiIds = bankUpiIds; S.auditLogs = auditLogs;
+  S.settings = {};
+  settingsArr.forEach(s => S.settings[s.key] = s.value);
+  if (!S.settings.references) S.settings.references = ['Karan','Paras'];
+  if (!S.settings.driveClientId) S.settings.driveClientId = '';
+  if (!S.settings.authorizedEmail) S.settings.authorizedEmail = '';
+  if (!S.settings.driveConnectedEmail) S.settings.driveConnectedEmail = '';
+  if (!S.settings.driveFolderId) S.settings.driveFolderId = '';
+  if (!S.settings.driveFileId) S.settings.driveFileId = '';
+  if (!S.settings.lastSynced) S.settings.lastSynced = '';
+}
+
+async function saveSetting(key, value){
+  S.settings[key] = value;
+  await putRec('settings', { key, value });
+}
+
+async function audit(action, entity, entityId, prevVal, newVal){
+  const rec = { timestamp: new Date().toISOString(), action, entity, entityId: String(entityId), prev: prevVal ? JSON.stringify(prevVal) : '', next: newVal ? JSON.stringify(newVal) : '' };
+  const id = await putRec('auditLogs', rec);
+  rec.id = id;
+  S.auditLogs.unshift(rec);
+  if (typeof scheduleSync === 'function') scheduleSync();
+}
+
+// ---- utils ----
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function fmtDate(d){ if(!d) return '—'; const dt = new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtMoney(n){ n = Number(n)||0; return '₹' + n.toLocaleString('en-IN',{maximumFractionDigits:0}); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function isoDate(d){ if(!d) return ''; const dt = new Date(d); if(isNaN(dt)) return ''; return dt.toISOString().slice(0,10); }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, kind=''){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' '+kind : '');
+  el.textContent = msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 3200);
+}
+function pad3(n){ return String(n).padStart(3,'0'); }
+
+function nextCode(list, field, prefix){
+  let max = 0;
+  list.forEach(r => {
+    const v = r[field];
+    if (v && v.startsWith(prefix)) {
+      const n = parseInt(v.slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return prefix + pad3(max + 1);
+}
+
+function findClient(id){ return S.clients.find(c => c.id === id); }
+function findBank(id){ return S.bankAccounts.find(b => b.id === id); }
+function findIpo(id){ return S.ipos.find(i => i.id === id); }
+function findPlan(id){ return S.ipoPlans.find(p => p.id === id); }
+
+function ipoStatus(ipo){
+  const today = todayStr();
+  if (!ipo.openDate || !ipo.closeDate) return 'Upcoming';
+  if (today < ipo.openDate) return 'Upcoming';
+  if (today >= ipo.openDate && today <= ipo.closeDate) return 'Open';
+  return 'Closed';
+}
+function statusBadgeClass(status){
+  const map = {
+    'Upcoming':'blue','Open':'green','Closed':'gray',
+    'Not Applied':'gray','To Be Applied':'blue','Applied':'teal',
+    'Allotted':'green','Not Allotted':'red','Pending Decision':'gray',
+    'Pending to Sell':'gold','Sold':'purple',
+    'Planned':'blue','Partially Executed':'gold','Executed':'green','Cancelled':'red',
+    'Active':'green','Inactive':'gray',
+    'Matched':'green','Bank Changed':'gold','Date Changed':'gold','Under Planned':'red','Over Planned':'blue',
+    'Not Planned':'red','Partially Planned':'gold'
+  };
+  return map[status] || 'gray';
+}
+function badge(status){ return `<span class="badge ${statusBadgeClass(status)}">${escapeHtml(status||'—')}</span>`; }
+
+// ---- bank capacity ----
+function bankCapacity(bankAccountId, dateStr){
+  const plans = S.ipoPlans.filter(p => p.bankAccountId === bankAccountId && p.plannedDate === dateStr && p.planStatus !== 'Cancelled');
+  const planned = plans.length;
+  const capacity = 6;
+  const available = capacity - planned;
+  const utilisation = Math.round((planned / capacity) * 1000) / 10;
+  let status = 'Available';
+  if (planned >= 7) status = 'Over Capacity';
+  else if (planned === 6) status = 'Full';
+  else if (planned >= 4) status = 'Near Capacity';
+  return { planned, capacity, available, utilisation, status, plans };
+}
+function capClass(status){
+  return { 'Available':'cap-avail','Near Capacity':'cap-near','Full':'cap-full','Over Capacity':'cap-over' }[status] || 'cap-avail';
+}
+
+// ---- planning vs actual ----
+function planVariance(plan){
+  const acts = S.applications.filter(a => a.planId === plan.id);
+  const actualCount = acts.length;
+  if (actualCount === 0) return 'Pending';
+  const bankChanged = acts.some(a => a.bankAccountId !== plan.bankAccountId);
+  const dateChanged = acts.some(a => a.applicationDate !== plan.plannedDate);
+  if (bankChanged) return 'Bank Changed';
+  if (dateChanged) return 'Date Changed';
+  if (actualCount < (plan.plannedClientCount||0)) return 'Under Planned';
+  if (actualCount > (plan.plannedClientCount||0)) return 'Over Planned';
+  return 'Matched';
+}
+
+// ---- profit ----
+// Allotment/Sale calculation. No partial sale: an allotted lot is either "Pending to Sell" or fully "Sold".
+// Gross Received / Our Profit / Client Profit are only meaningful once Allotted + Sold, and each is independently overridable.
+function isFilled(v){ return v !== null && v !== undefined && v !== ''; }
+function calcAllotmentSale(app){
+  const applicable = app.allotmentStatus === 'Allotted' && app.saleStatus === 'Sold' && isFilled(app.saleAmount);
+  if (!applicable){
+    return { applicable:false, calculatedGross:null, grossFinal:null, grossOverridden:false, calculatedOur:null, ourFinal:null, ourOverridden:false, calculatedClient:null, clientFinal:null, clientOverridden:false };
+  }
+  const applied = Number(app.amountApplied)||0;
+  const sale = Number(app.saleAmount)||0;
+  const calculatedGross = applied + 0.5*(sale-applied);
+  const grossOverridden = !!app.grossReceivedOverridden && isFilled(app.grossReceived);
+  const grossFinal = grossOverridden ? Number(app.grossReceived) : calculatedGross;
+  const calculatedOur = grossFinal - applied;
+  const ourOverridden = !!app.ourProfitOverridden && isFilled(app.ourProfit);
+  const ourFinal = ourOverridden ? Number(app.ourProfit) : calculatedOur;
+  const calculatedClient = sale - grossFinal;
+  const clientOverridden = !!app.clientProfitOverridden && isFilled(app.clientProfit);
+  const clientFinal = clientOverridden ? Number(app.clientProfit) : calculatedClient;
+  return { applicable:true, calculatedGross, grossFinal, grossOverridden, calculatedOur, ourFinal, ourOverridden, calculatedClient, clientFinal, clientOverridden };
+}
+// Back-compat alias used across stats/reports/excel for the business-side profit ("Our Profit")
+function calcProfit(app){ const r = calcAllotmentSale(app); return { final: r.applicable ? r.ourFinal : 0, overridden: r.ourOverridden, calculated: r.applicable ? r.calculatedOur : 0 }; }
+
+</script>
+<script>
+// ---- Navigation ----
+const NAV = [
+  { id:'dashboard', label:'Dashboard', ico:'&#9673;' },
+  { id:'planning', label:'IPO Planning', ico:'&#128197;' },
+  { id:'clients', label:'Clients', ico:'&#128100;' },
+  { id:'ipos', label:'IPOs', ico:'&#128176;' },
+  { id:'applications', label:'Applications', ico:'&#128203;' },
+  { id:'allotments', label:'Allotments &amp; Sale', ico:'&#127942;' },
+  { id:'banks', label:'Bank Accounts', ico:'&#127974;' },
+  { id:'reports', label:'Reports', ico:'&#128202;' },
+  { id:'settings', label:'Settings', ico:'&#9881;' }
+];
+function renderNav(){
+  const el = document.getElementById('navList');
+  el.innerHTML = NAV.map(n => `<div class="nav-item ${S.view===n.id?'active':''}" onclick="navigate('${n.id}')"><span class="ico">${n.ico}</span><span>${n.label}</span></div>`).join('');
+}
+function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('open'); }
+function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
+
+function navigate(view, params={}){
+  S.view = view; S.params = params;
+  closeSidebar();
+  renderNav();
+  const titles = {dashboard:'Dashboard',planning:'IPO Planning',clients:'Clients',ipos:'IPOs',applications:'Applications',allotments:'Allotments & Sale',banks:'Bank Accounts',reports:'Reports',settings:'Settings'};
+  document.getElementById('pageTitle').textContent = titles[view] || 'Portal';
+  render();
+  window.scrollTo(0,0);
+}
+
+function render(){
+  const c = document.getElementById('content');
+  switch(S.view){
+    case 'dashboard': c.innerHTML = viewDashboard(); afterDashboard(); break;
+    case 'planning': c.innerHTML = viewPlanning(); afterPlanning(); break;
+    case 'clients': c.innerHTML = S.params.id ? viewClientDetail(S.params.id) : viewClients(); break;
+    case 'ipos': c.innerHTML = viewIpos(); break;
+    case 'applications': c.innerHTML = viewApplications(); break;
+    case 'allotments': c.innerHTML = viewAllotments(); break;
+    case 'banks': c.innerHTML = viewBanks(); break;
+    case 'reports': c.innerHTML = viewReports(); break;
+    case 'settings': c.innerHTML = viewSettings(); break;
+    default: c.innerHTML = '<p>Not found</p>';
+  }
+}
+
+// ---- Modal helpers ----
+function openModal(title, bodyHtml, footHtml, wide=false){
+  document.getElementById('modalTitle').innerHTML = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFoot').innerHTML = footHtml || '';
+  document.getElementById('modalBox').classList.toggle('wide', wide);
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') closeModal(); });
+
+function confirmAction(msg, onYes){
+  openModal('Confirm', `<p style="font-size:13px;line-height:1.5;">${msg}</p>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-danger" id="confirmYesBtn">Continue</button>`);
+  document.getElementById('confirmYesBtn').onclick = () => { closeModal(); onYes(); };
+}
+
+// ---- generic field builder ----
+function fieldHtml(f, val){
+  val = (val===undefined||val===null) ? '' : val;
+  const req = f.required ? 'required' : '';
+  let inner = '';
+  if (f.type === 'select'){
+    inner = `<select id="fld_${f.key}" ${req} ${f.onchange?`onchange="${f.onchange}"`:''}>
+      ${f.placeholder?`<option value="">${f.placeholder}</option>`:''}
+      ${f.options.map(o=>{
+        const ov = typeof o === 'object' ? o.value : o;
+        const ol = typeof o === 'object' ? o.label : o;
+        return `<option value="${escapeHtml(ov)}" ${String(val)===String(ov)?'selected':''}>${escapeHtml(ol)}</option>`;
+      }).join('')}
+    </select>`;
+  } else if (f.type === 'textarea'){
+    inner = `<textarea id="fld_${f.key}" ${req}>${escapeHtml(val)}</textarea>`;
+  } else {
+    inner = `<input type="${f.type||'text'}" id="fld_${f.key}" value="${escapeHtml(val)}" ${req} ${f.step?`step="${f.step}"`:''} ${f.min!==undefined?`min="${f.min}"`:''} placeholder="${escapeHtml(f.placeholder||'')}">`;
+  }
+  return `<div class="f-group ${f.span2?'span2':''}"><label>${f.label}${f.required?' *':''}</label>${inner}${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
+}
+function readFields(fields){
+  const out = {};
+  fields.forEach(f => {
+    const el = document.getElementById('fld_'+f.key);
+    if (!el) return;
+    let v = el.value;
+    if (f.type === 'number') v = v === '' ? null : Number(v);
+    out[f.key] = v;
+  });
+  return out;
+}
+
+// ---- generic table with search/filter/sort/pagination ----
+function makeTableController(id, opts){
+  // opts: {data, columns, pageSize, rowClick, searchFields, filters:[{key,label,options}], extraToolbar}
+  if (!window.__tableState) window.__tableState = {};
+  if (!window.__tableState[id]) window.__tableState[id] = { search:'', sortKey:null, sortDir:1, page:1, filterVals:{} };
+  return window.__tableState[id];
+}
+function renderDataTable(id, opts){
+  const st = makeTableController(id, opts);
+  let rows = opts.data.slice();
+  // filters
+  (opts.filters||[]).forEach(f => {
+    const v = st.filterVals[f.key];
+    if (v) rows = rows.filter(r => f.match ? f.match(r, v) : String(r[f.key]) === String(v));
+  });
+  // search
+  if (st.search && opts.searchFn) {
+    rows = rows.filter(r => opts.searchFn(r, st.search.toLowerCase()));
+  }
+  // sort
+  if (st.sortKey) {
+    rows.sort((a,b) => {
+      let av = opts.sortValue ? opts.sortValue(a, st.sortKey) : a[st.sortKey];
+      let bv = opts.sortValue ? opts.sortValue(b, st.sortKey) : b[st.sortKey];
+      if (av===undefined||av===null) av='';
+      if (bv===undefined||bv===null) bv='';
+      if (typeof av === 'number' && typeof bv === 'number') return (av-bv)*st.sortDir;
+      return String(av).localeCompare(String(bv)) * st.sortDir;
+    });
+  }
+  const pageSize = opts.pageSize || 12;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  if (st.page > totalPages) st.page = totalPages;
+  const pageRows = rows.slice((st.page-1)*pageSize, st.page*pageSize);
+
+  // expose the full filtered/searched (pre-pagination) id set so "select all" actions can select
+  // everything matching the current filter/search, not just the current page or the whole dataset.
+  window.__lastFilteredIds = window.__lastFilteredIds || {};
+  window.__lastFilteredIds[id] = rows.map(r=>r.id);
+
+  const toolbar = `
+    <div class="list-toolbar">
+      ${opts.searchFn ? `<input type="text" placeholder="${opts.searchPlaceholder||'Search...'}" value="${escapeHtml(st.search)}" oninput="__tblSearch('${id}',this.value)">` : ''}
+      ${(opts.filters||[]).map(f => `
+        <select onchange="__tblFilter('${id}','${f.key}',this.value)">
+          <option value="">${f.label}: All</option>
+          ${f.options.map(o=>`<option value="${escapeHtml(o)}" ${st.filterVals[f.key]===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+        </select>`).join('')}
+      <div class="spacer"></div>
+      ${opts.extraToolbar || ''}
+    </div>`;
+
+  const thead = `<tr>${opts.columns.map(c => `<th onclick="__tblSort('${id}','${c.key}')">${c.label}${st.sortKey===c.key?(st.sortDir===1?' ▲':' ▼'):''}</th>`).join('')}${opts.rowActions?'<th>Actions</th>':''}</tr>`;
+  const tbody = pageRows.length ? pageRows.map(r => `
+    <tr class="${opts.rowClick?'clickable':''}" ${opts.rowClick?`onclick="${opts.rowClick}(${JSON.stringify(r.id)})"`:''}>
+      ${opts.columns.map(c => `<td>${c.render ? c.render(r) : escapeHtml(r[c.key])}</td>`).join('')}
+      ${opts.rowActions?`<td onclick="event.stopPropagation()">${opts.rowActions(r)}</td>`:''}
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="${opts.columns.length + (opts.rowActions?1:0)}">No records found.</td></tr>`;
+
+  const pagination = `<div class="pagination">
+    <span class="small-muted">${rows.length} record(s)</span>
+    <button ${st.page<=1?'disabled':''} onclick="__tblPage('${id}',${st.page-1})">Prev</button>
+    <span>Page ${st.page} / ${totalPages}</span>
+    <button ${st.page>=totalPages?'disabled':''} onclick="__tblPage('${id}',${st.page+1})">Next</button>
+  </div>`;
+
+  return `${toolbar}<div class="table-wrap"><table class="dt"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>${pagination}`;
+}
+window.__tableRerender = {};
+function __tblSearch(id, val){ window.__tableState[id].search = val; window.__tableState[id].page = 1; if(window.__tableRerender[id]) window.__tableRerender[id](); }
+function __tblFilter(id, key, val){ window.__tableState[id].filterVals[key] = val; window.__tableState[id].page = 1; if(window.__tableRerender[id]) window.__tableRerender[id](); }
+function __tblSort(id, key){
+  const st = window.__tableState[id];
+  if (st.sortKey === key) st.sortDir *= -1; else { st.sortKey = key; st.sortDir = 1; }
+  if(window.__tableRerender[id]) window.__tableRerender[id]();
+}
+function __tblPage(id, p){ window.__tableState[id].page = p; if(window.__tableRerender[id]) window.__tableRerender[id](); }
+</script>
+<script>
+/* =================== CLIENTS =================== */
+function clientStats(clientId){
+  const apps = S.applications.filter(a => a.clientId === clientId);
+  const allotted = apps.filter(a => a.allotmentStatus === 'Allotted');
+  const notAllotted = apps.filter(a => a.allotmentStatus === 'Not Allotted');
+  const sold = apps.filter(a => a.saleStatus === 'Sold');
+  const amountApplied = apps.reduce((s,a)=>s+(Number(a.amountApplied)||0),0);
+  const grossReceived = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.grossFinal:0); },0);
+  const profit = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.ourFinal:0); },0);
+  const clientProfit = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.clientFinal:0); },0);
+  const ipoIds = new Set(apps.map(a=>a.ipoId));
+  return { apps, allotted, notAllotted, sold, amountApplied, grossReceived, profit, clientProfit, ipoCount: ipoIds.size };
+}
+
+function viewClients(){
+  window.__tableRerender['clientsTbl'] = () => {
+    document.getElementById('clientsTblWrap').innerHTML = renderDataTable('clientsTbl', {
+      data: S.clients,
+      searchFn: (r,q) => (r.clientId+' '+r.clientName+' '+(r.referenceName||'')+' '+(r.subReference||'')).toLowerCase().includes(q),
+      searchPlaceholder: 'Search by ID, name, reference...',
+      filters: [{ key:'referenceName', label:'Reference', options:S.settings.references }],
+      pageSize: 10,
+      rowClick: 'openClientDetail',
+      columns: [
+        { key:'clientId', label:'Client ID' },
+        { key:'clientName', label:'Name' },
+        { key:'referenceName', label:'Reference' },
+        { key:'subReference', label:'Sub Reference', render:r=>escapeHtml(r.subReference||'—') },
+        { key:'ipos', label:'IPOs', render:r=>clientStats(r.id).ipoCount },
+        { key:'apps', label:'Applications', render:r=>clientStats(r.id).apps.length },
+        { key:'allotments', label:'Allotments', render:r=>clientStats(r.id).allotted.length },
+        { key:'profit', label:'Profit', render:r=>fmtMoney(clientStats(r.id).profit) },
+        { key:'status', label:'Status', render:r=>badge(r.status) }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-ghost" onclick="editClient(${r.id})">Edit</button>
+                         <button class="btn btn-sm btn-danger" onclick="deleteClient(${r.id})">Delete</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['clientsTbl'](), 0);
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Clients</h3><div class="spacer"></div><button class="btn btn-primary" onclick="editClient()">+ Add Client</button></div>
+    <div class="sc-body" id="clientsTblWrap"></div>
+  </div>`;
+}
+
+function clientFields(c){
+  return [
+    { key:'clientName', label:'Client Name', required:true },
+    { key:'referenceName', label:'Reference', type:'select', options:S.settings.references, required:true },
+    { key:'subReference', label:'Sub Reference' },
+    { key:'status', label:'Status', type:'select', options:['Active','Inactive'] }
+  ].map(f => fieldHtml(f, c ? c[f.key] : (f.key==='status'?'Active':''))).join('');
+}
+function editClient(id){
+  const c = id ? findClient(id) : null;
+  openModal(c ? 'Edit Client' : 'Add Client',
+    `<div class="form-grid">${clientFields(c)}</div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveClient(${id||'null'})">Save</button>`);
+}
+async function saveClient(id){
+  const fields = [{key:'clientName'},{key:'referenceName'},{key:'subReference'},{key:'status'}];
+  const data = readFields(fields);
+  if (!data.clientName){ toast('Client name is required','warn'); return; }
+  if (id){
+    const existing = findClient(id);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    await putRec('clients', updated);
+    Object.assign(existing, updated);
+    await audit('Client Edit','Client', existing.clientId, existing, updated);
+    toast('Client updated','ok');
+  } else {
+    const clientId = nextCode(S.clients, 'clientId', 'CL');
+    const rec = { clientId, ...data, status: data.status||'Active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newId = await putRec('clients', rec);
+    rec.id = newId;
+    S.clients.push(rec);
+    await audit('Client Creation','Client', clientId, null, rec);
+    toast('Client added','ok');
+  }
+  closeModal(); navigate('clients');
+}
+function deleteClient(id){
+  const c = findClient(id);
+  const stats = clientStats(id);
+  const msg = stats.apps.length
+    ? `This client (${escapeHtml(c.clientId)}) has ${stats.apps.length} associated application(s). Deleting it may affect reporting. Continue?`
+    : `Delete client ${escapeHtml(c.clientId)} - ${escapeHtml(c.clientName)}?`;
+  confirmAction(msg, async () => {
+    await delRec('clients', id);
+    S.clients = S.clients.filter(x => x.id !== id);
+    await audit('Client Deletion','Client', c.clientId, c, null);
+    toast('Client deleted','ok');
+    navigate('clients');
+  });
+}
+function openClientDetail(id){ navigate('clients', { id }); }
+
+function viewClientDetail(id){
+  const c = findClient(id);
+  if (!c) return `<p>Client not found. <button class="link-btn" onclick="navigate('clients')">Back</button></p>`;
+  const stats = clientStats(id);
+  const rows = stats.apps.map(a => {
+    const ipo = findIpo(a.ipoId); const bank = findBank(a.bankAccountId);
+    const plan = a.planId ? findPlan(a.planId) : null;
+    const calc = calcAllotmentSale(a);
+    return `<tr>
+      <td>${escapeHtml(ipo?ipo.ipoName:'—')}</td>
+      <td>${plan?'Yes':'No'}</td>
+      <td>${badge(a.applicationStatus)}</td>
+      <td>${escapeHtml(bank?bank.bankName:'—')}</td>
+      <td>${fmtDate(a.applicationDate)}</td>
+      <td>${fmtMoney(a.amountApplied)}</td>
+      <td>${badge(a.allotmentStatus||'Pending Decision')}</td>
+      <td>${fmtDate(a.saleDate)}</td>
+      <td>${calc.applicable?fmtMoney(calc.grossFinal):'—'}${calc.grossOverridden?' <span class="badge gold">Ovr</span>':''}</td>
+      <td>${calc.applicable?fmtMoney(calc.ourFinal):'—'}${calc.ourOverridden?' <span class="badge gold">Ovr</span>':''}</td>
+    </tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="10">No IPO history yet.</td></tr>`;
+
+  return `
+  <button class="link-btn" onclick="navigate('clients')">&larr; Back to Clients</button>
+  <div class="section-card" style="margin-top:10px;">
+    <div class="sc-head">
+      <h3>${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)}</h3>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" onclick="editClient(${c.id})">Edit Client</button>
+    </div>
+    <div class="sc-body">
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div><span class="small-muted">Reference</span><br><b>${escapeHtml(c.referenceName||'—')}</b></div>
+        <div><span class="small-muted">Sub Reference</span><br><b>${escapeHtml(c.subReference||'—')}</b></div>
+        <div><span class="small-muted">Status</span><br>${badge(c.status)}</div>
+        <div><span class="small-muted">Added</span><br><b>${fmtDate(c.createdAt)}</b></div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="lbl">Total IPOs</div><div class="val">${stats.ipoCount}</div></div>
+        <div class="kpi-card"><div class="lbl">Applications</div><div class="val">${stats.apps.length}</div></div>
+        <div class="kpi-card"><div class="lbl">Allotments</div><div class="val ok">${stats.allotted.length}</div></div>
+        <div class="kpi-card"><div class="lbl">Not Allotted</div><div class="val danger">${stats.notAllotted.length}</div></div>
+        <div class="kpi-card"><div class="lbl">Sold</div><div class="val">${stats.sold.length}</div></div>
+        <div class="kpi-card"><div class="lbl">Amount Applied</div><div class="val">${fmtMoney(stats.amountApplied)}</div></div>
+        <div class="kpi-card"><div class="lbl">Gross Received</div><div class="val">${fmtMoney(stats.grossReceived)}</div></div>
+        <div class="kpi-card"><div class="lbl">Our Profit</div><div class="val gold">${fmtMoney(stats.profit)}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="section-card">
+    <div class="sc-head"><h3>IPO History</h3></div>
+    <div class="sc-body table-wrap">
+      <table class="dt"><thead><tr>
+        <th>IPO</th><th>Planned</th><th>App Status</th><th>Bank</th><th>App Date</th><th>Amount Applied</th><th>Allotment</th><th>Sale Date</th><th>Gross Received</th><th>Our Profit</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+</script>
+<script>
+/* =================== BANK ACCOUNTS =================== */
+function bankStats(bankId){
+  const plans = S.ipoPlans.filter(p=>p.bankAccountId===bankId);
+  const apps = S.applications.filter(a=>a.bankAccountId===bankId);
+  const profit = apps.reduce((s,a)=>s+calcProfit(a).final,0);
+  return { plans, apps, profit };
+}
+function viewBanks(){
+  window.__tableRerender['banksTbl'] = () => {
+    document.getElementById('banksTblWrap').innerHTML = renderDataTable('banksTbl', {
+      data: S.bankAccounts,
+      searchFn: (r,q) => (r.bankId+' '+r.bankName+' '+r.accountHolderName).toLowerCase().includes(q),
+      searchPlaceholder: 'Search bank / account holder...',
+      filters: [{ key:'status', label:'Status', options:['Active','Inactive'] }],
+      pageSize: 10,
+      columns: [
+        { key:'bankId', label:'Bank ID' },
+        { key:'bankName', label:'Bank Name' },
+        { key:'accountHolderName', label:'Account Holder' },
+        { key:'status', label:'Status', render:r=>badge(r.status) },
+        { key:'plans', label:'Plans (all-time)', render:r=>bankStats(r.id).plans.length },
+        { key:'apps', label:'Applications', render:r=>bankStats(r.id).apps.length },
+        { key:'upis', label:'UPI IDs', render:r=>bankUpis(r.id).length },
+        { key:'profit', label:'Our Profit', render:r=>fmtMoney(bankStats(r.id).profit) },
+        { key:'today', label:"Today's Utilisation", render:r=>{ const cap = bankCapacity(r.id, todayStr()); return `<span class="cap-cell ${capClass(cap.status)}">${cap.planned}/6</span>`; } }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-ghost" onclick="editBank(${r.id})">Edit</button>
+                         <button class="btn btn-sm btn-danger" onclick="deleteBank(${r.id})">Delete</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['banksTbl'](), 0);
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Bank Accounts</h3><div class="spacer"></div><button class="btn btn-primary" onclick="editBank()">+ Add Bank Account</button></div>
+    <div class="sc-body" id="banksTblWrap"></div>
+  </div>
+  <p class="small-muted">Rule: maximum 6 IPOs may be planned per bank account per day (soft warning, not enforced as a hard block).</p>`;
+}
+function bankFields(b){
+  return [
+    { key:'bankName', label:'Bank Name', required:true, placeholder:'e.g. HDFC Bank' },
+    { key:'accountHolderName', label:'Account Holder Name', required:true },
+    { key:'status', label:'Status', type:'select', options:['Active','Inactive'] }
+  ].map(f => fieldHtml(f, b ? b[f.key] : (f.key==='status'?'Active':''))).join('');
+}
+/* ---- UPI IDs per bank account (bankUpiIds store) ---- */
+function bankUpis(bankAccountId){ return S.bankUpiIds.filter(u=>u.bankAccountId===bankAccountId); }
+let __editingBankUpiDraft = []; // {id|null, upiId, _tempKey}
+function editBank(id){
+  const b = id ? findBank(id) : null;
+  __editingBankUpiDraft = id ? bankUpis(id).map(u=>({ id:u.id, upiId:u.upiId, _tempKey: 'u'+u.id })) : [];
+  openModal(b ? 'Edit Bank Account' : 'Add Bank Account',
+    `<div class="form-grid">${bankFields(b)}</div>
+     <div class="f-group span2" style="margin-top:14px;">
+       <label>UPI IDs (optional — a bank account may have zero, one, or several)</label>
+       <div id="bankUpiRows"></div>
+       <button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px;width:fit-content;" onclick="addBankUpiRow()">+ Add UPI ID</button>
+     </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBank(${id||'null'})">Save</button>`);
+  renderBankUpiRows();
+}
+function renderBankUpiRows(){
+  const wrap = document.getElementById('bankUpiRows');
+  if (!wrap) return;
+  wrap.innerHTML = __editingBankUpiDraft.length ? __editingBankUpiDraft.map((u,idx)=>`
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <input type="text" value="${escapeHtml(u.upiId)}" placeholder="e.g. paras@hdfc" oninput="__editingBankUpiDraft[${idx}].upiId=this.value" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+      <button type="button" class="btn btn-sm btn-danger" onclick="removeBankUpiRow(${idx})">Delete</button>
+    </div>`).join('') : `<div class="small-muted">No UPI IDs added.</div>`;
+}
+function addBankUpiRow(){ __editingBankUpiDraft.push({ id:null, upiId:'', _tempKey:'new'+Date.now() }); renderBankUpiRows(); }
+function removeBankUpiRow(idx){ __editingBankUpiDraft.splice(idx,1); renderBankUpiRows(); }
+async function saveBank(id){
+  const data = readFields([{key:'bankName'},{key:'accountHolderName'},{key:'status'}]);
+  if (!data.bankName || !data.accountHolderName){ toast('Bank name and account holder are required','warn'); return; }
+
+  const cleanedUpis = __editingBankUpiDraft.map(u=>({ ...u, upiId: (u.upiId||'').trim() })).filter(u=>u.upiId);
+  const seen = new Set();
+  for (const u of cleanedUpis){
+    const key = u.upiId.toLowerCase();
+    if (seen.has(key)){ toast('Duplicate UPI ID entered — each UPI ID must be unique for this bank account','warn'); return; }
+    seen.add(key);
+  }
+
+  let bankAccountId = id;
+  if (id){
+    const existing = findBank(id);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    await putRec('bankAccounts', updated); Object.assign(existing, updated);
+    await audit('Bank Account Edit','BankAccount', existing.bankId, existing, updated);
+    toast('Bank account updated','ok');
+  } else {
+    const bankId = nextCode(S.bankAccounts, 'bankId', 'BANK');
+    const rec = { bankId, ...data, status: data.status||'Active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newId = await putRec('bankAccounts', rec); rec.id = newId; S.bankAccounts.push(rec);
+    bankAccountId = newId;
+    await audit('Bank Account Creation','BankAccount', bankId, null, rec);
+    toast('Bank account added','ok');
+  }
+
+  // sync UPI rows: delete removed, update existing, create new
+  const existingUpis = bankUpis(bankAccountId);
+  const keptIds = new Set(cleanedUpis.filter(u=>u.id).map(u=>u.id));
+  for (const old of existingUpis){
+    if (!keptIds.has(old.id)){
+      await delRec('bankUpiIds', old.id);
+      S.bankUpiIds = S.bankUpiIds.filter(x=>x.id!==old.id);
+      await audit('UPI Deleted','BankUpiId', old.id, old, null);
+    }
+  }
+  for (const u of cleanedUpis){
+    if (u.id){
+      const existingRec = S.bankUpiIds.find(x=>x.id===u.id);
+      if (existingRec && existingRec.upiId !== u.upiId){
+        const updated = { ...existingRec, upiId: u.upiId, updatedAt: new Date().toISOString() };
+        await putRec('bankUpiIds', updated); Object.assign(existingRec, updated);
+        await audit('UPI Edited','BankUpiId', u.id, existingRec, updated);
+      }
+    } else {
+      const rec = { bankAccountId, upiId: u.upiId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const newId = await putRec('bankUpiIds', rec); rec.id = newId; S.bankUpiIds.push(rec);
+      await audit('UPI Added','BankUpiId', newId, null, rec);
+    }
+  }
+  closeModal(); navigate('banks');
+}
+function deleteBank(id){
+  const b = findBank(id);
+  const stats = bankStats(id);
+  const msg = (stats.plans.length || stats.apps.length)
+    ? `This bank account (${escapeHtml(b.bankId)}) has associated historical transactions. Deleting it may affect reporting. Continue?`
+    : `Delete bank account ${escapeHtml(b.bankId)} - ${escapeHtml(b.bankName)}?`;
+  confirmAction(msg, async () => {
+    await delRec('bankAccounts', id);
+    S.bankAccounts = S.bankAccounts.filter(x=>x.id!==id);
+    for (const u of bankUpis(id)){ await delRec('bankUpiIds', u.id); }
+    S.bankUpiIds = S.bankUpiIds.filter(x=>x.bankAccountId!==id);
+    await audit('Bank Account Deletion','BankAccount', b.bankId, b, null);
+    toast('Bank account deleted','ok'); navigate('banks');
+  });
+}
+
+/* =================== IPOs =================== */
+function ipoStats(ipoId){
+  const apps = S.applications.filter(a=>a.ipoId===ipoId);
+  const plans = S.ipoPlans.filter(p=>p.ipoId===ipoId);
+  const allotted = apps.filter(a=>a.allotmentStatus==='Allotted');
+  const profit = apps.reduce((s,a)=>s+calcProfit(a).final,0);
+  return { apps, plans, allotted, profit };
+}
+function viewIpos(){
+  window.__tableRerender['iposTbl'] = () => {
+    document.getElementById('iposTblWrap').innerHTML = renderDataTable('iposTbl', {
+      data: S.ipos,
+      searchFn: (r,q) => (r.ipoId+' '+r.ipoName).toLowerCase().includes(q),
+      searchPlaceholder: 'Search IPO name...',
+      filters: [{ key:'status', label:'Status', options:['Upcoming','Open','Closed'], match:(r,v)=>ipoStatus(r)===v }],
+      pageSize: 10,
+      columns: [
+        { key:'ipoId', label:'IPO ID' },
+        { key:'ipoName', label:'IPO Name' },
+        { key:'minimumApplicationAmount', label:'Min Amount', render:r=>fmtMoney(r.minimumApplicationAmount) },
+        { key:'openDate', label:'Open', render:r=>fmtDate(r.openDate) },
+        { key:'closeDate', label:'Close', render:r=>fmtDate(r.closeDate) },
+        { key:'allotmentDate', label:'Allotment Date', render:r=>fmtDate(r.allotmentDate) },
+        { key:'status', label:'Status', render:r=>badge(ipoStatus(r)) },
+        { key:'planned', label:'Planned', render:r=>ipoStats(r.id).plans.length },
+        { key:'apps', label:'Applications', render:r=>ipoStats(r.id).apps.length },
+        { key:'allotments', label:'Allotments', render:r=>ipoStats(r.id).allotted.length },
+        { key:'profit', label:'Profit', render:r=>fmtMoney(ipoStats(r.id).profit) }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-ghost" onclick="editIpo(${r.id})">Edit</button>
+                         <button class="btn btn-sm btn-danger" onclick="deleteIpo(${r.id})">Delete</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['iposTbl'](), 0);
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>IPOs</h3><div class="spacer"></div><button class="btn btn-primary" onclick="editIpo()">+ Add IPO</button></div>
+    <div class="sc-body" id="iposTblWrap"></div>
+  </div>`;
+}
+function ipoFields(i){
+  return [
+    { key:'ipoName', label:'IPO Name', required:true },
+    { key:'minimumApplicationAmount', label:'Minimum Application Amount', type:'number', required:true },
+    { key:'openDate', label:'Open Date', type:'date', required:true },
+    { key:'closeDate', label:'Close Date', type:'date', required:true },
+    { key:'allotmentDate', label:'Allotment Date', type:'date', hint:'Company-wide allotment date for this IPO — automatically applied to every application\u2019s Allotment & Sale record and not editable per-application.' }
+  ].map(f => fieldHtml(f, i ? i[f.key] : '')).join('');
+}
+function editIpo(id){
+  const i = id ? findIpo(id) : null;
+  openModal(i ? 'Edit IPO' : 'Add IPO',
+    `<div class="form-grid">${ipoFields(i)}</div><p class="hint">Status (Upcoming / Open / Closed) is calculated automatically from today's date vs open/close dates.</p>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveIpo(${id||'null'})">Save</button>`);
+}
+async function saveIpo(id){
+  const data = readFields([{key:'ipoName'},{key:'minimumApplicationAmount',type:'number'},{key:'openDate'},{key:'closeDate'},{key:'allotmentDate'}]);
+  if (!data.ipoName || !data.openDate || !data.closeDate){ toast('IPO name and dates are required','warn'); return; }
+  if (data.closeDate < data.openDate){ toast('Close date cannot be before open date','warn'); return; }
+  if (!data.allotmentDate) data.allotmentDate = null;
+  if (id){
+    const existing = findIpo(id);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    await putRec('ipos', updated); Object.assign(existing, updated);
+    await audit('IPO Edit','IPO', existing.ipoId, existing, updated);
+    toast('IPO updated','ok');
+  } else {
+    const ipoId = nextCode(S.ipos, 'ipoId', 'IPO');
+    const rec = { ipoId, ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newId = await putRec('ipos', rec); rec.id = newId; S.ipos.push(rec);
+    await audit('IPO Creation','IPO', ipoId, null, rec);
+    toast('IPO added','ok');
+  }
+  closeModal(); navigate('ipos');
+}
+function deleteIpo(id){
+  const i = findIpo(id);
+  const stats = ipoStats(id);
+  const msg = (stats.plans.length || stats.apps.length)
+    ? `This IPO (${escapeHtml(i.ipoId)}) has associated planning/application records. Deleting it may affect reporting. Continue?`
+    : `Delete IPO ${escapeHtml(i.ipoId)} - ${escapeHtml(i.ipoName)}?`;
+  confirmAction(msg, async () => {
+    await delRec('ipos', id);
+    S.ipos = S.ipos.filter(x=>x.id!==id);
+    await audit('IPO Deletion','IPO', i.ipoId, i, null);
+    toast('IPO deleted','ok'); navigate('ipos');
+  });
+}
+</script>
+<script>
+/* =================== IPO PLANNING =================== */
+let planningTab = 'plans'; // plans | calendar | variance | capacity
+
+function viewPlanning(){
+  return `
+  <div class="tabs">
+    <button class="${planningTab==='plans'?'active':''}" onclick="setPlanningTab('plans')">Plan List</button>
+    <button class="${planningTab==='calendar'?'active':''}" onclick="setPlanningTab('calendar')">Planning Calendar</button>
+    <button class="${planningTab==='capacity'?'active':''}" onclick="setPlanningTab('capacity')">Capacity Dashboard</button>
+    <button class="${planningTab==='variance'?'active':''}" onclick="setPlanningTab('variance')">Planned vs Actual</button>
+    <button class="${planningTab==='upcoming'?'active':''}" onclick="setPlanningTab('upcoming')">Upcoming IPO Planner</button>
+  </div>
+  <div id="planningTabBody"></div>`;
+}
+function setPlanningTab(t){ planningTab = t; render(); }
+function afterPlanning(){
+  const el = document.getElementById('planningTabBody');
+  if (planningTab==='plans') el.innerHTML = planningPlansTab();
+  else if (planningTab==='calendar') el.innerHTML = planningCalendarTab();
+  else if (planningTab==='capacity') el.innerHTML = planningCapacityTab();
+  else if (planningTab==='variance') el.innerHTML = planningVarianceTab();
+  else if (planningTab==='upcoming') el.innerHTML = planningUpcomingTab();
+  if (planningTab==='plans') { setTimeout(()=>window.__tableRerender['plansTbl'] && window.__tableRerender['plansTbl'](), 0); }
+}
+
+function planStatusComputed(plan){
+  const v = planVariance(plan);
+  if (plan.planStatus === 'Cancelled') return 'Cancelled';
+  if (v === 'Pending') return 'Planned';
+  if (v === 'Matched' || v === 'Bank Changed' || v === 'Date Changed') return 'Executed';
+  return 'Partially Executed';
+}
+
+function planningPlansTab(){
+  window.__tableRerender['plansTbl'] = () => {
+    document.getElementById('plansTblWrap').innerHTML = renderDataTable('plansTbl', {
+      data: S.ipoPlans,
+      searchFn: (r,q) => { const ipo=findIpo(r.ipoId); return ((ipo?ipo.ipoName:'')+' '+r.plannedDate).toLowerCase().includes(q); },
+      searchPlaceholder: 'Search by IPO...',
+      filters: [
+        { key:'bankAccountId', label:'Bank', options: S.bankAccounts.map(b=>b.bankName), match:(r,v)=>{ const b=findBank(r.bankAccountId); return b && b.bankName===v; } }
+      ],
+      pageSize: 10,
+      columns: [
+        { key:'ipoId', label:'IPO', render:r=>{ const i=findIpo(r.ipoId); return escapeHtml(i?i.ipoName:'—'); } },
+        { key:'plannedDate', label:'Planned Date', render:r=>fmtDate(r.plannedDate) },
+        { key:'bankAccountId', label:'Bank', render:r=>{ const b=findBank(r.bankAccountId); return escapeHtml(b?b.bankName:'—'); } },
+        { key:'plannedClientCount', label:'Planned Clients' },
+        { key:'status', label:'Status', render:r=>badge(planStatusComputed(r)) },
+        { key:'variance', label:'Vs Actual', render:r=>badge(planVariance(r)) },
+        { key:'notes', label:'Notes', render:r=>escapeHtml(r.notes||'—') }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-ghost" onclick="planClients(${r.id})">Clients</button>
+                         <button class="btn btn-sm btn-ghost" onclick="editPlan(${r.id})">Edit</button>
+                         <button class="btn btn-sm btn-danger" onclick="deletePlan(${r.id})">Delete</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['plansTbl'](), 0);
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>IPO Plans</h3><div class="spacer"></div>
+      <button class="btn btn-gold" onclick="bulkPlanClients()">Bulk Plan Clients</button>
+      <button class="btn btn-primary" onclick="editPlan()">+ New Plan</button>
+    </div>
+    <div class="sc-body" id="plansTblWrap"></div>
+  </div>`;
+}
+
+function planFields(p){
+  return [
+    { key:'ipoId', label:'IPO', type:'select', required:true, placeholder:'Select IPO', options: S.ipos.map(i=>({value:i.id,label:i.ipoName})) },
+    { key:'plannedDate', label:'Planned Application Date', type:'date', required:true },
+    { key:'bankAccountId', label:'Bank Account', type:'select', required:true, placeholder:'Select Bank', options: S.bankAccounts.filter(b=>b.status==='Active').map(b=>({value:b.id,label:b.bankName})) },
+    { key:'plannedClientCount', label:'Planned Number of Client Applications', type:'number' },
+    { key:'planStatus', label:'Planned Status', type:'select', options:['Planned','Partially Executed','Executed','Cancelled'] },
+    { key:'notes', label:'Notes', type:'textarea', span2:true }
+  ].map(f => fieldHtml(f, p ? p[f.key] : (f.key==='planStatus'?'Planned':''))).join('');
+}
+function editPlan(id){
+  const p = id ? findPlan(id) : null;
+  openModal(p ? 'Edit IPO Plan' : 'New IPO Plan',
+    `<div class="form-grid">${planFields(p)}</div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePlan(${id||'null'})">Save</button>`, true);
+}
+async function savePlan(id, forceOverride){
+  const data = readFields([{key:'ipoId',type:'number'},{key:'plannedDate'},{key:'bankAccountId',type:'number'},{key:'plannedClientCount',type:'number'},{key:'planStatus'},{key:'notes'}]);
+  if (!data.ipoId || !data.plannedDate || !data.bankAccountId){ toast('IPO, date and bank are required','warn'); return; }
+
+  // duplicate check
+  const dup = S.ipoPlans.find(x => x.ipoId===data.ipoId && x.bankAccountId===data.bankAccountId && x.plannedDate===data.plannedDate && x.id !== id);
+  if (dup && !forceOverride){
+    openModal('Duplicate Plan',
+      `<p style="font-size:13px;">This IPO is already planned through this bank account on this date. You can edit the existing plan instead, or continue to create another record.</p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+       <button class="btn btn-gold" onclick="closeModal(); editPlan(${dup.id})">Edit Existing Plan</button>
+       <button class="btn btn-danger" onclick="savePlan(${id||'null'}, true)">Continue Anyway</button>`);
+    return;
+  }
+
+  // capacity check
+  const cap = bankCapacity(data.bankAccountId, data.plannedDate);
+  const alreadyCounted = id ? S.ipoPlans.some(x=>x.id===id && x.bankAccountId===data.bankAccountId && x.plannedDate===data.plannedDate) : false;
+  const projected = alreadyCounted ? cap.planned : cap.planned + 1;
+  if (projected > 6 && !forceOverride){
+    const bank = findBank(data.bankAccountId);
+    openModal('⚠️ Capacity Warning',
+      `<p style="font-size:13px;line-height:1.6;">${escapeHtml(bank.bankName)} already has <b>${cap.planned}</b> IPO(s) planned for ${fmtDate(data.plannedDate)}.<br>
+       Maximum recommended capacity: <b>6</b><br>Current planned: <b>${cap.planned}</b><br>Available: <b>${cap.available}</b><br><br>Do you want to continue anyway?</p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+       <button class="btn btn-danger" onclick="savePlan(${id||'null'}, true)">Continue Anyway</button>`);
+    return;
+  }
+
+  if (id){
+    const existing = findPlan(id);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    await putRec('ipoPlans', updated); Object.assign(existing, updated);
+    await audit('Plan Modification','IPOPlan', id, existing, updated);
+    toast('Plan updated','ok');
+  } else {
+    const rec = { ...data, planStatus: data.planStatus||'Planned', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newId = await putRec('ipoPlans', rec); rec.id = newId; S.ipoPlans.push(rec);
+    await audit('Plan Creation','IPOPlan', newId, null, rec);
+    toast('Plan created','ok');
+  }
+  closeModal(); navigate('planning');
+}
+function deletePlan(id){
+  const p = findPlan(id);
+  const dependentClients = S.plannedClients.filter(pc=>pc.planId===id);
+  const msg = dependentClients.length
+    ? `This plan has ${dependentClients.length} client(s) mapped to it. Deleting it will release those clients for re-planning against this IPO. Continue?`
+    : `Delete this plan?`;
+  confirmAction(msg, async () => {
+    await delRec('ipoPlans', id);
+    S.ipoPlans = S.ipoPlans.filter(x=>x.id!==id);
+    for (const pc of dependentClients){ await delRec('plannedClients', pc.id); }
+    S.plannedClients = S.plannedClients.filter(x=>x.planId!==id);
+    await audit('Plan Modification','IPOPlan', id, p, null);
+    toast('Plan deleted','ok'); navigate('planning');
+  });
+}
+
+/* ---- duplicate-client-per-IPO eligibility rule ----
+   A client already mapped to an ACTIVE (non-cancelled) plan for a given IPO cannot be
+   mapped to another plan of the SAME IPO, regardless of bank/date/plan. Deleting or
+   cancelling the plan releases the client for that IPO again. Deleting an application
+   does NOT release the client — only the plan controls eligibility. */
+function clientAlreadyPlannedForIpo(clientId, ipoId, excludePlanId){
+  return S.plannedClients.some(pc => {
+    if (pc.clientId !== clientId) return false;
+    if (excludePlanId && pc.planId === excludePlanId) return false;
+    const plan = findPlan(pc.planId);
+    return plan && plan.ipoId === ipoId && plan.planStatus !== 'Cancelled';
+  });
+}
+
+/* ---- client mapping for a plan ---- */
+function planClients(planId){
+  const p = findPlan(planId);
+  const ipo = findIpo(p.ipoId);
+  const mapped = S.plannedClients.filter(pc => pc.planId === planId);
+  const rows = S.clients.map(c => {
+    const pc = mapped.find(m=>m.clientId===c.id);
+    const app = S.applications.find(a=>a.planId===planId && a.clientId===c.id);
+    const blockedElsewhere = !pc && clientAlreadyPlannedForIpo(c.id, p.ipoId, planId);
+    return `<tr>
+      <td>${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)}</td>
+      <td>${pc?'Yes':'No'}</td>
+      <td>${pc ? escapeHtml(findBank(p.bankAccountId).bankName) : '—'}</td>
+      <td>${app ? badge(app.applicationStatus) : (pc?badge('To Be Applied'):(blockedElsewhere?'<span class="badge gray">Already planned for this IPO</span>':'<span class="small-muted">Not Planned</span>'))}</td>
+      <td>${blockedElsewhere ? '<span class="small-muted">Blocked</span>' : `<label class="checkbox-row"><input type="checkbox" data-cid="${c.id}" ${pc?'checked':''} onchange="togglePlanClient(${planId},${c.id},this.checked)"> Plan</label>`}</td>
+    </tr>`;
+  }).join('');
+  openModal(`Plan Clients — ${escapeHtml(ipo.ipoName)}`,
+    `<p class="small-muted">Select which clients are planned for this IPO/bank/date slot. A client already planned for this IPO under another active plan cannot be selected again until that plan is deleted or cancelled.</p>
+     <div class="table-wrap"><table class="dt"><thead><tr><th>Client</th><th>Planned</th><th>Bank</th><th>Status</th><th>Toggle</th></tr></thead>
+     <tbody>${rows}</tbody></table></div>`,
+    `<button class="btn btn-primary" onclick="closeModal()">Done</button>`, true);
+}
+async function togglePlanClient(planId, clientId, checked){
+  const plan = findPlan(planId);
+  if (checked && clientAlreadyPlannedForIpo(clientId, plan.ipoId, planId)){
+    toast('This client is already planned for this IPO under another active plan','warn');
+    planClients(planId);
+    return;
+  }
+  const existing = S.plannedClients.find(pc=>pc.planId===planId && pc.clientId===clientId);
+  if (checked && !existing){
+    const rec = { planId, clientId, createdAt: new Date().toISOString() };
+    const id = await putRec('plannedClients', rec); rec.id = id; S.plannedClients.push(rec);
+    await audit('Plan Modification','PlannedClient', id, null, rec);
+  } else if (!checked && existing){
+    await delRec('plannedClients', existing.id);
+    S.plannedClients = S.plannedClients.filter(x=>x.id!==existing.id);
+    await audit('Plan Modification','PlannedClient', existing.id, existing, null);
+  }
+}
+
+/* ---- bulk client planning ---- */
+let __bulkPlanSearch = '';
+function bulkPlanClients(){
+  __bulkPlanSearch = '';
+  const ipoOpts = S.ipos.map(i=>`<option value="${i.id}">${escapeHtml(i.ipoName)}</option>`).join('');
+  const bankOpts = S.bankAccounts.filter(b=>b.status==='Active').map(b=>`<option value="${b.id}">${escapeHtml(b.bankName)}</option>`).join('');
+  openModal('Bulk Plan Clients',
+    `<div class="form-grid">
+      <div class="f-group"><label>IPO *</label><select id="bpIpo" onchange="renderBulkPlanClientList()"><option value="">Select IPO</option>${ipoOpts}</select></div>
+      <div class="f-group"><label>Planned Date *</label><input type="date" id="bpDate"></div>
+      <div class="f-group"><label>Bank Account *</label><select id="bpBank"><option value="">Select Bank</option>${bankOpts}</select></div>
+      <div class="f-group"><label>&nbsp;</label><div class="small-muted">6-IPO/bank/day capacity rule applies to the plan slot, not client count.</div></div>
+    </div>
+    <div class="f-group span2" style="margin-top:12px;">
+      <label>Select Clients</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+        <input type="text" id="bpSearch" placeholder="Search by client name or ID..." oninput="__bulkPlanSearch=this.value; renderBulkPlanClientList()" style="flex:1;min-width:180px;border:1px solid var(--border);border-radius:6px;padding:7px 10px;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="bulkPlanSelectAll()">Select All</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="bulkPlanClearAll()">Clear All</button>
+        <span class="small-muted" id="bpSelectedCount">Selected: 0 clients</span>
+      </div>
+      <div id="bpClientListWrap" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 12px;"></div>
+    </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitBulkPlan()">Create Plan &amp; Map Clients</button>`, true);
+  renderBulkPlanClientList();
+}
+function renderBulkPlanClientList(){
+  const wrap = document.getElementById('bpClientListWrap');
+  if (!wrap) return;
+  const ipoId = Number(document.getElementById('bpIpo').value) || null;
+  const q = (__bulkPlanSearch||'').toLowerCase();
+  const prevChecked = new Set(Array.from(document.querySelectorAll('.bulkPlanClient:checked')).map(el=>Number(el.value)));
+  const visible = S.clients.filter(c => !q || (c.clientId+' '+c.clientName).toLowerCase().includes(q));
+  wrap.innerHTML = visible.map(c=>{
+    const blocked = ipoId && clientAlreadyPlannedForIpo(c.id, ipoId, null);
+    const inactive = c.status === 'Inactive';
+    const checked = prevChecked.has(c.id);
+    return `<label class="checkbox-row" style="padding:4px 0;${blocked?'opacity:.5;':''}${inactive&&!blocked?'color:var(--text-dim);':''}">
+      <input type="checkbox" class="bulkPlanClient" value="${c.id}" ${blocked?'disabled':''} ${checked&&!blocked?'checked':''} onchange="updateBulkPlanSelectedCount()">
+      ${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)} ${inactive?'<span class="badge gray">Inactive</span>':''} ${blocked?'<span class="badge gray">Already planned for this IPO</span>':''}
+    </label>`;
+  }).join('') || `<div class="small-muted">No clients match.</div>`;
+  updateBulkPlanSelectedCount();
+}
+function bulkPlanSelectAll(){ document.querySelectorAll('.bulkPlanClient:not(:disabled)').forEach(el=>el.checked=true); updateBulkPlanSelectedCount(); }
+function bulkPlanClearAll(){ document.querySelectorAll('.bulkPlanClient').forEach(el=>el.checked=false); updateBulkPlanSelectedCount(); }
+function updateBulkPlanSelectedCount(){
+  const n = document.querySelectorAll('.bulkPlanClient:checked').length;
+  const el = document.getElementById('bpSelectedCount');
+  if (el) el.textContent = `Selected: ${n} client${n===1?'':'s'}`;
+}
+async function submitBulkPlan(force){
+  const ipoId = Number(document.getElementById('bpIpo').value);
+  const plannedDate = document.getElementById('bpDate').value;
+  const bankAccountId = Number(document.getElementById('bpBank').value);
+  let clientIds = Array.from(document.querySelectorAll('.bulkPlanClient:checked:not(:disabled)')).map(el=>Number(el.value));
+  if (!ipoId || !plannedDate || !bankAccountId){ toast('IPO, date and bank are required','warn'); return; }
+  if (!clientIds.length){ toast('Select at least one client','warn'); return; }
+
+  // defensive re-check against duplicate-client-per-IPO rule
+  const blocked = clientIds.filter(cid => clientAlreadyPlannedForIpo(cid, ipoId, null));
+  clientIds = clientIds.filter(cid => !blocked.includes(cid));
+  if (!clientIds.length){ toast('All selected clients are already planned for this IPO','warn'); return; }
+
+  let plan = S.ipoPlans.find(x=>x.ipoId===ipoId && x.bankAccountId===bankAccountId && x.plannedDate===plannedDate);
+  if (!plan){
+    const cap = bankCapacity(bankAccountId, plannedDate);
+    if (cap.planned + 1 > 6 && !force){
+      const bank = findBank(bankAccountId);
+      openModal('⚠️ Capacity Warning',
+        `<p style="font-size:13px;line-height:1.6;">${escapeHtml(bank.bankName)} already has <b>${cap.planned}</b> IPO(s) planned for ${fmtDate(plannedDate)}.<br>Maximum recommended capacity: <b>6</b><br>Available: <b>${cap.available}</b><br><br>Continue anyway?</p>`,
+        `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="submitBulkPlan(true)">Continue Anyway</button>`);
+      return;
+    }
+    const rec = { ipoId, plannedDate, bankAccountId, plannedClientCount: clientIds.length, planStatus:'Planned', notes:'', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const id = await putRec('ipoPlans', rec); rec.id = id; S.ipoPlans.push(rec); plan = rec;
+    await audit('Plan Creation','IPOPlan', id, null, rec);
+  } else {
+    plan.plannedClientCount = (plan.plannedClientCount||0) + clientIds.length;
+    await putRec('ipoPlans', plan);
+  }
+  for (const cid of clientIds){
+    if (!S.plannedClients.some(pc=>pc.planId===plan.id && pc.clientId===cid)){
+      const rec = { planId: plan.id, clientId: cid, createdAt: new Date().toISOString() };
+      const id = await putRec('plannedClients', rec); rec.id = id; S.plannedClients.push(rec);
+    }
+  }
+  toast(`${clientIds.length} client(s) planned for ${findIpo(ipoId).ipoName}${blocked.length?` (${blocked.length} skipped — already planned for this IPO)`:''}`, 'ok');
+  closeModal(); navigate('planning');
+}
+</script>
+
+<script>
+/* ---- planning calendar ---- */
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+function planningCalendarTab(){
+  const activeBanks = S.bankAccounts.filter(b=>b.status==='Active');
+  const first = new Date(calYear, calMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const monthName = first.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+
+  let cells = '';
+  for (let i=0;i<startDow;i++) cells += `<div class="cal-cell empty"></div>`;
+  for (let d=1; d<=daysInMonth; d++){
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const bankLines = activeBanks.slice(0,4).map(b=>{
+      const cap = bankCapacity(b.id, dateStr);
+      return `<div class="bankline"><span>${escapeHtml(b.bankName.slice(0,10))}</span><span class="cap-cell ${capClass(cap.status)}" style="padding:0 5px;">${cap.planned}/6</span></div>`;
+    }).join('');
+    cells += `<div class="cal-cell" onclick="openCalendarDate('${dateStr}')"><div class="dnum">${d}</div>${bankLines}${activeBanks.length>4?`<div class="small-muted">+${activeBanks.length-4} more</div>`:''}</div>`;
+  }
+  return `
+  <div class="section-card">
+    <div class="sc-head">
+      <button class="btn btn-ghost btn-sm" onclick="calShift(-1)">&larr;</button>
+      <h3 style="min-width:170px;text-align:center;">${monthName}</h3>
+      <button class="btn btn-ghost btn-sm" onclick="calShift(1)">&rarr;</button>
+      <div class="spacer"></div>
+      <span class="small-muted">Click a date to see per-bank planning detail</span>
+    </div>
+    <div class="sc-body">
+      <div class="cal-grid" style="margin-bottom:6px;">
+        ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="small-muted" style="text-align:center;font-weight:700;">${d}</div>`).join('')}
+      </div>
+      <div class="cal-grid">${cells}</div>
+    </div>
+  </div>`;
+}
+function calShift(n){ calMonth += n; if (calMonth<0){calMonth=11;calYear--;} if(calMonth>11){calMonth=0;calYear++;} render(); }
+function openCalendarDate(dateStr){
+  const activeBanks = S.bankAccounts.filter(b=>b.status==='Active');
+  const blocks = activeBanks.map(b=>{
+    const cap = bankCapacity(b.id, dateStr);
+    const list = cap.plans.map(p=>{ const ipo = findIpo(p.ipoId); return `<li>${escapeHtml(ipo?ipo.ipoName:'—')} <span class="small-muted">(${p.plannedClientCount||0} clients planned)</span></li>`; }).join('') || '<li class="small-muted">No IPOs planned</li>';
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;"><b>${escapeHtml(b.bankName)}</b><span class="cap-cell ${capClass(cap.status)}">${cap.planned}/6 used</span><span class="small-muted">${cap.available} slot(s) remaining</span></div>
+      <ul style="margin:6px 0 0 18px;font-size:12.5px;">${list}</ul>
+    </div>`;
+  }).join('');
+  openModal(`Planning Detail — ${fmtDate(dateStr)}`, blocks,
+    `<button class="btn btn-primary" onclick="closeModal()">Close</button>`, true);
+}
+
+/* ---- capacity dashboard ---- */
+function planningCapacityTab(){
+  const activeBanks = S.bankAccounts.filter(b=>b.status==='Active');
+  const dateSet = new Set(S.ipoPlans.map(p=>p.plannedDate));
+  if (!dateSet.size) dateSet.add(todayStr());
+  const rows = [];
+  activeBanks.forEach(b => {
+    dateSet.forEach(d => {
+      const cap = bankCapacity(b.id, d);
+      if (cap.planned > 0) rows.push({ bank:b.bankName, date:d, ...cap });
+    });
+  });
+  rows.sort((a,b)=> a.date.localeCompare(b.date) || a.bank.localeCompare(b.bank));
+  const trs = rows.map(r=>`<tr>
+    <td>${escapeHtml(r.bank)}</td><td>${fmtDate(r.date)}</td><td>${r.planned}</td><td>${r.capacity}</td>
+    <td>${r.available}</td><td>${r.utilisation}%</td><td><span class="cap-cell ${capClass(r.status)}">${r.status}</span></td>
+  </tr>`).join('') || `<tr class="empty-row"><td colspan="7">No planning activity yet.</td></tr>`;
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Bank Capacity Dashboard</h3></div>
+    <div class="sc-body table-wrap">
+      <table class="dt"><thead><tr><th>Bank</th><th>Date</th><th>Planned IPOs</th><th>Capacity</th><th>Available</th><th>Utilisation</th><th>Status</th></tr></thead>
+      <tbody>${trs}</tbody></table>
+    </div>
+  </div>`;
+}
+
+/* ---- planned vs actual variance ---- */
+function planningVarianceTab(){
+  const rows = S.ipoPlans.map(p=>{
+    const ipo = findIpo(p.ipoId); const bank = findBank(p.bankAccountId);
+    const acts = S.applications.filter(a=>a.planId===p.id);
+    const actualBank = acts.length ? findBank(acts[0].bankAccountId) : null;
+    const actualDate = acts.length ? acts[0].applicationDate : null;
+    return `<tr>
+      <td>${escapeHtml(ipo?ipo.ipoName:'—')}</td>
+      <td>${fmtDate(p.plannedDate)}</td>
+      <td>${escapeHtml(bank?bank.bankName:'—')}</td>
+      <td>${p.plannedClientCount||0}</td>
+      <td>${actualDate?fmtDate(actualDate):'—'}</td>
+      <td>${actualBank?escapeHtml(actualBank.bankName):'—'}</td>
+      <td>${acts.length}</td>
+      <td>${badge(planVariance(p))}</td>
+    </tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="8">No plans yet.</td></tr>`;
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Planned vs Actual</h3></div>
+    <div class="sc-body table-wrap">
+      <table class="dt"><thead><tr><th>IPO</th><th>Planned Date</th><th>Planned Bank</th><th>Planned Clients</th><th>Actual Date</th><th>Actual Bank</th><th>Actual Applications</th><th>Variance</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+
+/* ---- upcoming IPO planner ---- */
+function upcomingPlanningStatus(ipo){
+  const plans = S.ipoPlans.filter(p=>p.ipoId===ipo.id);
+  if (!plans.length) return 'Not Planned';
+  const totalPlannedClients = plans.reduce((s,p)=>s+(p.plannedClientCount||0),0);
+  const mappedClients = S.plannedClients.filter(pc => plans.some(p=>p.id===pc.planId)).length;
+  if (mappedClients >= totalPlannedClients && totalPlannedClients > 0) return 'Planned';
+  return 'Partially Planned';
+}
+function planningUpcomingTab(){
+  const upcoming = S.ipos.filter(i => ipoStatus(i) !== 'Closed').sort((a,b)=>a.openDate.localeCompare(b.openDate));
+  const rows = upcoming.map(i=>{
+    const plans = S.ipoPlans.filter(p=>p.ipoId===i.id);
+    const banks = [...new Set(plans.map(p=>{ const b=findBank(p.bankAccountId); return b?b.bankName:''; }))].filter(Boolean).join(', ') || '—';
+    return `<tr><td>${escapeHtml(i.ipoName)}</td><td>${fmtDate(i.openDate)}</td><td>${fmtDate(i.closeDate)}</td><td>${badge(ipoStatus(i))}</td><td>${escapeHtml(banks)}</td><td>${badge(upcomingPlanningStatus(i))}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="quickPlan(${i.id})">Plan</button></td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="7">No upcoming or open IPOs.</td></tr>`;
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Upcoming IPO Planner</h3></div>
+    <div class="sc-body table-wrap">
+      <table class="dt"><thead><tr><th>IPO</th><th>Open</th><th>Close</th><th>Status</th><th>Bank(s) Planned</th><th>Planning Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+function quickPlan(ipoId){
+  editPlan();
+  setTimeout(()=>{ const sel = document.getElementById('fld_ipoId'); if (sel) sel.value = ipoId; }, 30);
+}
+</script>
+<script>
+/* =================== APPLICATIONS =================== */
+const APP_STATUSES = ['Not Applied','To Be Applied','Applied'];
+
+function findApp(id){ return S.applications.find(a=>a.id===id); }
+
+/* UPI select helper: renders based on how many UPIs the chosen bank has */
+function upiOptionsHtml(bankAccountId, selectedUpiId){
+  const upis = bankAccountId ? bankUpis(Number(bankAccountId)) : [];
+  if (!upis.length) return `<div class="small-muted" id="upiFieldInner">No UPI ID configured for this bank account.</div>`;
+  if (upis.length === 1) return `<input type="hidden" id="fld_upiId" value="${upis[0].id}"><div class="small-muted" id="upiFieldInner">${escapeHtml(upis[0].upiId)} (auto-selected)</div>`;
+  return `<select id="fld_upiId">${upis.map(u=>`<option value="${u.id}" ${String(selectedUpiId)===String(u.id)?'selected':''}>${escapeHtml(u.upiId)}</option>`).join('')}</select>`;
+}
+function refreshAppUpiField(bankAccountId, prefix){
+  prefix = prefix || '';
+  const wrap = document.getElementById(prefix+'upiFieldWrap');
+  if (!wrap) return;
+  wrap.innerHTML = upiOptionsHtml(bankAccountId, null).replace('fld_upiId', prefix+'fld_upiId').replace('upiFieldInner', prefix+'upiFieldInner');
+}
+
+let __selectedAppIds = new Set();
+function viewApplications(){
+  window.__tableRerender['appsTbl'] = () => {
+    document.getElementById('appsTblWrap').innerHTML = renderDataTable('appsTbl', {
+      data: S.applications,
+      searchFn: (r,q) => { const c=findClient(r.clientId), i=findIpo(r.ipoId); const u=S.bankUpiIds.find(x=>x.id===r.upiId); return ((c?c.clientName:'')+' '+(i?i.ipoName:'')+' '+(u?u.upiId:'')).toLowerCase().includes(q); },
+      searchPlaceholder: 'Search client, IPO, UPI...',
+      filters: [
+        { key:'applicationStatus', label:'Status', options: APP_STATUSES },
+        { key:'ipoId', label:'IPO', options: S.ipos.map(i=>i.ipoName), match:(r,v)=>{ const i=findIpo(r.ipoId); return i && i.ipoName===v; } },
+        { key:'bankAccountId', label:'Bank', options: S.bankAccounts.map(b=>b.bankName), match:(r,v)=>{ const b=findBank(r.bankAccountId); return b && b.bankName===v; } }
+      ],
+      pageSize: 12,
+      columns: [
+        { key:'sel', label:`<input type="checkbox" onchange="toggleAllAppSelection(this.checked)">`, render:r=>`<input type="checkbox" class="appSelCk" ${__selectedAppIds.has(r.id)?'checked':''} onchange="toggleAppSelection(${r.id}, this.checked)">` },
+        { key:'clientId', label:'Client', render:r=>{ const c=findClient(r.clientId); return escapeHtml(c?`${c.clientId} — ${c.clientName}`:'—'); } },
+        { key:'ipoId', label:'IPO', render:r=>{ const i=findIpo(r.ipoId); return escapeHtml(i?i.ipoName:'—'); } },
+        { key:'bankAccountId', label:'Bank', render:r=>{ const b=findBank(r.bankAccountId); return escapeHtml(b?b.bankName:'—'); } },
+        { key:'applicationDate', label:'App Date', render:r=>fmtDate(r.applicationDate) },
+        { key:'upiId', label:'UPI ID', render:r=>{ const u=S.bankUpiIds.find(x=>x.id===r.upiId); return escapeHtml(u?u.upiId:'—'); } },
+        { key:'amountApplied', label:'Amount Applied', render:r=>fmtMoney(r.amountApplied) },
+        { key:'applicationStatus', label:'Status', render:r=>badge(r.applicationStatus) },
+        { key:'plan', label:'From Plan', render:r=>r.planId?'Yes':'No' }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-ghost" onclick="editApplication(${r.id})">Edit</button>
+                         <button class="btn btn-sm btn-danger" onclick="deleteApplication(${r.id})">Delete</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['appsTbl'](), 0);
+  return `
+  <div class="section-card">
+    <div class="sc-head" style="flex-wrap:wrap;">
+      <h3>Applications</h3><div class="spacer"></div>
+      <span class="small-muted">Selected: ${__selectedAppIds.size}</span>
+      <select id="bulkStatusSelect" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;">
+        ${APP_STATUSES.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="bulkUpdateAppStatus()">Update Selected</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearAppSelection()">Clear Selection</button>
+      <button class="btn btn-gold" onclick="bulkApplyFromPlan()">Bulk Apply from Plan</button>
+      <button class="btn btn-primary" onclick="editApplication()">+ New Application</button>
+    </div>
+    <div class="sc-body" id="appsTblWrap"></div>
+  </div>`;
+}
+function toggleAppSelection(id, checked){ if (checked) __selectedAppIds.add(id); else __selectedAppIds.delete(id); navigate('applications'); }
+function toggleAllAppSelection(checked){
+  const filteredIds = (window.__lastFilteredIds && window.__lastFilteredIds['appsTbl']) || [];
+  if (checked) filteredIds.forEach(id => __selectedAppIds.add(id));
+  else filteredIds.forEach(id => __selectedAppIds.delete(id));
+  navigate('applications');
+}
+function clearAppSelection(){ __selectedAppIds = new Set(); navigate('applications'); }
+async function bulkUpdateAppStatus(){
+  if (!__selectedAppIds.size){ toast('No applications selected','warn'); return; }
+  const status = document.getElementById('bulkStatusSelect').value;
+  for (const id of __selectedAppIds){
+    const existing = findApp(id);
+    if (!existing || existing.applicationStatus === status) continue;
+    const updated = { ...existing, applicationStatus: status, updatedAt: new Date().toISOString() };
+    await putRec('applications', updated); Object.assign(existing, updated);
+    await audit('Application Status Change','Application', id, existing, updated);
+  }
+  toast(`Status updated for ${__selectedAppIds.size} application(s)`, 'ok');
+  __selectedAppIds = new Set();
+  navigate('applications');
+}
+
+function appFields(a){
+  const planOpts = S.ipoPlans.map(p=>{ const ipo=findIpo(p.ipoId); return {value:p.id, label:`${ipo?ipo.ipoName:''} · ${fmtDate(p.plannedDate)}`}; });
+  return [
+    { key:'clientId', label:'Client', type:'select', required:true, placeholder:'Select Client', options: S.clients.map(c=>({value:c.id,label:`${c.clientId} — ${c.clientName}`})) },
+    { key:'ipoId', label:'IPO', type:'select', required:true, placeholder:'Select IPO', options: S.ipos.map(i=>({value:i.id,label:i.ipoName})) },
+    { key:'bankAccountId', label:'Bank Account', type:'select', required:true, placeholder:'Select Bank', onchange:"refreshAppUpiField(this.value,'')", options: S.bankAccounts.map(b=>({value:b.id,label:b.bankName})) },
+    { key:'applicationDate', label:'Application Date', type:'date', required:true },
+    { key:'amountApplied', label:'Amount Applied', type:'number', required:true },
+    { key:'applicationStatus', label:'Application Status', type:'select', options: APP_STATUSES },
+    { key:'planId', label:'Originating Plan (optional)', type:'select', placeholder:'None', options: planOpts, span2:true }
+  ].map(f => fieldHtml(f, a ? a[f.key] : (f.key==='applicationStatus'?'To Be Applied':(f.key==='applicationDate'?todayStr():'')))).join('');
+}
+function editApplication(id){
+  const a = id ? findApp(id) : null;
+  openModal(a ? 'Edit Application' : 'New Application',
+    `<div class="form-grid">${appFields(a)}
+      <div class="f-group"><label>UPI ID</label><div id="upiFieldWrap">${upiOptionsHtml(a?a.bankAccountId:'', a?a.upiId:null)}</div></div>
+    </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveApplication(${id||'null'})">Save</button>`, true);
+}
+function dateWarnings(data){
+  const warns = [];
+  const ipo = findIpo(data.ipoId);
+  if (ipo && data.applicationDate && (data.applicationDate < ipo.openDate || data.applicationDate > ipo.closeDate)) warns.push('Application date is outside the IPO open/close period.');
+  return warns;
+}
+async function saveApplication(id, force){
+  const fields = [{key:'clientId',type:'number'},{key:'ipoId',type:'number'},{key:'bankAccountId',type:'number'},{key:'applicationDate'},{key:'amountApplied',type:'number'},{key:'applicationStatus'},{key:'planId',type:'number'}];
+  const data = readFields(fields);
+  const upiEl = document.getElementById('fld_upiId');
+  data.upiId = upiEl ? (upiEl.value ? Number(upiEl.value) : null) : null;
+  if (!data.clientId || !data.ipoId || !data.bankAccountId || !data.applicationDate || !data.amountApplied){ toast('Client, IPO, bank, date and amount are required','warn'); return; }
+  if (!data.planId) data.planId = null;
+
+  const warns = dateWarnings(data);
+  if (warns.length && !force){
+    openModal('Date Warning', `<p style="font-size:13px;">${warns.join('<br>')}</p><p class="small-muted">You can still save this record.</p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="saveApplication(${id||'null'}, true)">Save Anyway</button>`);
+    return;
+  }
+
+  if (id){
+    const existing = findApp(id);
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    await putRec('applications', updated); Object.assign(existing, updated);
+    await audit('Application Status Change','Application', id, existing, updated);
+    toast('Application updated','ok');
+  } else {
+    const rec = { ...data, allotmentStatus:'Pending Decision', allotmentDate:null, saleStatus:null, saleDate:null, saleAmount:null,
+      calculatedGrossReceived:null, grossReceived:null, grossReceivedOverridden:false,
+      calculatedOurProfit:null, ourProfit:null, ourProfitOverridden:false,
+      calculatedClientProfit:null, clientProfit:null, clientProfitOverridden:false,
+      createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const newId = await putRec('applications', rec); rec.id = newId; S.applications.push(rec);
+    await audit('Application Creation','Application', newId, null, rec);
+    toast('Application created','ok');
+  }
+  closeModal(); navigate('applications');
+}
+function deleteApplication(id){
+  confirmAction('Delete this application record? This will remove associated history from reporting.', async () => {
+    const a = findApp(id);
+    await delRec('applications', id);
+    S.applications = S.applications.filter(x=>x.id!==id);
+    await audit('Application Status Change','Application', id, a, null);
+    toast('Application deleted','ok'); navigate('applications');
+  });
+}
+
+/* ---- bulk apply from plan ---- */
+function bulkApplyFromPlan(){
+  const openPlans = S.ipoPlans.filter(p=>p.planStatus!=='Cancelled');
+  const opts = openPlans.map(p=>{ const ipo=findIpo(p.ipoId); const bank=findBank(p.bankAccountId); return `<option value="${p.id}">${escapeHtml(ipo?ipo.ipoName:'')} · ${escapeHtml(bank?bank.bankName:'')} · ${fmtDate(p.plannedDate)}</option>`; }).join('');
+  openModal('Bulk Apply from Plan',
+    `<div class="f-group"><label>Select Plan</label><select id="baPlan" onchange="renderBulkApplyClients()"><option value="">Select a plan</option>${opts}</select></div>
+     <div id="baClientsWrap" style="margin-top:12px;"></div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitBulkApply()">Mark Selected as Applied</button>`, true);
+}
+function renderBulkApplyClients(){
+  const planId = Number(document.getElementById('baPlan').value);
+  const wrap = document.getElementById('baClientsWrap');
+  if (!planId){ wrap.innerHTML=''; return; }
+  const plan = findPlan(planId);
+  const plannedClientIds = S.plannedClients.filter(pc=>pc.planId===planId).map(pc=>pc.clientId);
+  const bankOpts = S.bankAccounts.filter(b=>b.status==='Active').map(b=>`<option value="${b.id}" ${b.id===plan.bankAccountId?'selected':''}>${escapeHtml(b.bankName)}</option>`).join('');
+  const rows = plannedClientIds.map(cid=>{
+    const c = findClient(cid);
+    const already = S.applications.some(a=>a.planId===planId && a.clientId===cid);
+    return `<tr>
+      <td><label class="checkbox-row"><input type="checkbox" class="baClient" value="${cid}" ${already?'disabled':'checked'}> ${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)}</label></td>
+      <td><input type="number" class="baAmt" data-cid="${cid}" placeholder="Amount" value="${findIpo(plan.ipoId)?.minimumApplicationAmount||''}" ${already?'disabled':''}></td>
+      <td>${already?'<span class="badge gray">Already Applied</span>':''}</td>
+    </tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="3">No clients mapped to this plan yet. Use "Clients" on the plan first.</td></tr>`;
+  wrap.innerHTML = `
+    <div class="form-grid one" style="margin-bottom:10px;">
+      <div class="f-group"><label>Application Date</label><input type="date" id="baDate" value="${plan.plannedDate}"></div>
+      <div class="f-group"><label>Bank Account</label><select id="baBank" onchange="refreshAppUpiField(this.value,'ba')">${bankOpts}</select></div>
+      <div class="f-group"><label>UPI ID (applies to every application in this batch)</label><div id="baupiFieldWrap">${upiOptionsHtml(plan.bankAccountId, null).replace('fld_upiId','bafld_upiId').replace('upiFieldInner','baupiFieldInner')}</div></div>
+    </div>
+    <div class="table-wrap"><table class="dt"><thead><tr><th>Client</th><th>Amount Applied</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+async function submitBulkApply(){
+  const planId = Number(document.getElementById('baPlan').value);
+  if (!planId){ toast('Select a plan first','warn'); return; }
+  const date = document.getElementById('baDate').value;
+  const bankAccountId = Number(document.getElementById('baBank').value);
+  const upiEl = document.getElementById('bafld_upiId');
+  const upiId = upiEl ? (upiEl.value ? Number(upiEl.value) : null) : null;
+  const checked = Array.from(document.querySelectorAll('.baClient:checked:not(:disabled)'));
+  if (!checked.length){ toast('No clients selected','warn'); return; }
+  let count = 0;
+  for (const chk of checked){
+    const cid = Number(chk.value);
+    const amt = Number(document.querySelector(`.baAmt[data-cid="${cid}"]`).value) || 0;
+    const plan = findPlan(planId);
+    const rec = { clientId:cid, ipoId:plan.ipoId, bankAccountId, applicationDate:date, upiId, amountApplied:amt,
+      applicationStatus:'Applied', planId, allotmentStatus:'Pending Decision', allotmentDate:null, saleStatus:null, saleDate:null, saleAmount:null,
+      calculatedGrossReceived:null, grossReceived:null, grossReceivedOverridden:false,
+      calculatedOurProfit:null, ourProfit:null, ourProfitOverridden:false,
+      calculatedClientProfit:null, clientProfit:null, clientProfitOverridden:false,
+      createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const id = await putRec('applications', rec); rec.id = id; S.applications.push(rec);
+    await audit('Application Creation','Application', id, null, rec);
+    count++;
+  }
+  toast(`${count} application(s) created`, 'ok');
+  closeModal(); navigate('applications');
+}
+</script>
+<script>
+/* =================== ALLOTMENTS & SALE =================== */
+const ALLOTMENT_STATUSES = ['Pending Decision','Allotted','Not Allotted'];
+const SALE_STATUSES = ['Pending to Sell','Sold'];
+const RECEIVE_STATUSES = ['Receivable','Received'];
+
+let __selectedAllotIds = new Set();
+
+function viewAllotments(){
+  const apps = S.applications.filter(a=>a.applicationStatus==='Applied' || a.allotmentStatus==='Allotted' || a.allotmentStatus==='Not Allotted');
+  const allotted = apps.filter(a=>a.allotmentStatus==='Allotted');
+  const notAllotted = apps.filter(a=>a.allotmentStatus==='Not Allotted');
+  const pending = apps.filter(a=>!a.allotmentStatus || a.allotmentStatus==='Pending Decision');
+  const allotRate = apps.length ? Math.round((allotted.length/apps.length)*1000)/10 : 0;
+  const pendingToSell = allotted.filter(a=>a.saleStatus!=='Sold');
+  const totalOurProfit = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s + (c.applicable?c.ourFinal:0); },0);
+  const totalClientProfit = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s + (c.applicable?c.clientFinal:0); },0);
+  const totalReceived = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s + (c.applicable && a.amountReceiveStatus==='Received' ? c.grossFinal : 0); },0);
+  const totalReceivable = apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s + (c.applicable && a.amountReceiveStatus==='Receivable' ? c.grossFinal : 0); },0);
+
+  window.__tableRerender['allotTbl'] = () => {
+    document.getElementById('allotTblWrap').innerHTML = renderDataTable('allotTbl', {
+      data: apps,
+      searchFn: (r,q) => { const c=findClient(r.clientId), i=findIpo(r.ipoId); return ((c?c.clientName:'')+' '+(i?i.ipoName:'')).toLowerCase().includes(q); },
+      searchPlaceholder: 'Search client, IPO...',
+      filters: [
+        { key:'allotmentStatus', label:'Allotment', options: ALLOTMENT_STATUSES },
+        { key:'saleStatus', label:'Sale', options: SALE_STATUSES },
+        { key:'amountReceiveStatus', label:'Amount', options: RECEIVE_STATUSES },
+        { key:'ipoId', label:'IPO', options: S.ipos.map(i=>i.ipoName), match:(r,v)=>{ const i=findIpo(r.ipoId); return i && i.ipoName===v; } }
+      ],
+      pageSize: 12,
+      columns: [
+        { key:'sel', label:`<input type="checkbox" onchange="toggleAllAllotSelection(this.checked)">`, render:r=>`<input type="checkbox" class="allotSelCk" ${__selectedAllotIds.has(r.id)?'checked':''} onchange="toggleAllotSelection(${r.id}, this.checked)">` },
+        { key:'clientId', label:'Client', render:r=>{ const c=findClient(r.clientId); return escapeHtml(c?c.clientName:'—'); } },
+        { key:'ipoId', label:'IPO', render:r=>{ const i=findIpo(r.ipoId); return escapeHtml(i?i.ipoName:'—'); } },
+        { key:'amountApplied', label:'Amount Applied', render:r=>fmtMoney(r.amountApplied) },
+        { key:'allotmentStatus', label:'Allotment', render:r=>badge(r.allotmentStatus||'Pending Decision') },
+        { key:'allotmentDate', label:'Allotment Date', render:r=>fmtDate(r.allotmentDate) },
+        { key:'saleStatus', label:'Sale', render:r=>r.saleStatus?badge(r.saleStatus):'—' },
+        { key:'saleDate', label:'Sale Date', render:r=>fmtDate(r.saleDate) },
+        { key:'saleAmount', label:'Sale Amount', render:r=>fmtMoney(r.saleAmount) },
+        { key:'grossReceived', label:'Gross Received', render:r=>{ const c=calcAllotmentSale(r); return c.applicable?(fmtMoney(c.grossFinal)+(c.grossOverridden?' <span class="badge gold">Ovr</span>':'')):'—'; } },
+        { key:'amountReceiveStatus', label:'Amount Status', render:r=>r.amountReceiveStatus?badge(r.amountReceiveStatus):'—' },
+        { key:'ourProfit', label:'Our Profit', render:r=>{ const c=calcAllotmentSale(r); return c.applicable?(fmtMoney(c.ourFinal)+(c.ourOverridden?' <span class="badge gold">Ovr</span>':'')):'—'; } },
+        { key:'clientProfit', label:'Client Profit', render:r=>{ const c=calcAllotmentSale(r); return c.applicable?(fmtMoney(c.clientFinal)+(c.clientOverridden?' <span class="badge gold">Ovr</span>':'')):'—'; } }
+      ],
+      rowActions: r => `<button class="btn btn-sm btn-primary" onclick="editAllotmentSale(${r.id})">Update</button>`
+    });
+  };
+  setTimeout(()=>window.__tableRerender['allotTbl'](), 0);
+
+  return `
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="lbl">Total Allotments</div><div class="val ok">${allotted.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Not Allotted</div><div class="val danger">${notAllotted.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Pending Decision</div><div class="val">${pending.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Allotment Rate</div><div class="val">${allotRate}%</div></div>
+    <div class="kpi-card"><div class="lbl">Pending to Sell</div><div class="val gold">${pendingToSell.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Our Profit</div><div class="val ok">${fmtMoney(totalOurProfit)}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Client Profit</div><div class="val">${fmtMoney(totalClientProfit)}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Received</div><div class="val ok">${fmtMoney(totalReceived)}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Receivable</div><div class="val gold">${fmtMoney(totalReceivable)}</div></div>
+  </div>
+  <div class="section-card">
+    <div class="sc-head" style="flex-wrap:wrap;gap:10px;">
+      <h3>Allotments &amp; Sale</h3><div class="spacer"></div>
+      <span class="small-muted">Selected: ${__selectedAllotIds.size}</span>
+      <button class="btn btn-ghost btn-sm" onclick="clearAllotSelection()">Clear Selection</button>
+    </div>
+    <div class="sc-body" style="padding-bottom:8px;">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;padding:10px 0 14px;border-bottom:1px solid var(--border);margin-bottom:12px;">
+        <div class="f-group" style="min-width:200px;">
+          <label>Bulk Update — Allotment Status</label>
+          <div style="display:flex;gap:6px;">
+            <select id="bulkAllotStatusSelect">${ALLOTMENT_STATUSES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>
+            <button class="btn btn-ghost btn-sm" onclick="bulkUpdateAllotmentStatus()">Update</button>
+          </div>
+        </div>
+        <div class="f-group" style="min-width:200px;">
+          <label>Bulk Update — Sale Date</label>
+          <div style="display:flex;gap:6px;">
+            <input type="date" id="bulkSaleDateInput">
+            <button class="btn btn-ghost btn-sm" onclick="bulkUpdateSaleDate()">Apply</button>
+          </div>
+          <div class="hint">Only applies to selected rows that are already Allotted; also sets Sale Status to Sold.</div>
+        </div>
+      </div>
+      <div id="allotTblWrap"></div>
+    </div>
+  </div>
+  <p class="small-muted">There is no partial sale — the entire allotted lot is sold in a single transaction. Gross Received = Applied Amount + 50% × (Sale Amount − Applied Amount); calculated automatically once Allotted + Sold, and independently overridable. Allotment Date is fixed at the IPO level (see IPOs tab) and cannot be edited per application.</p>`;
+}
+function toggleAllotSelection(id, checked){ if (checked) __selectedAllotIds.add(id); else __selectedAllotIds.delete(id); navigate('allotments'); }
+function toggleAllAllotSelection(checked){
+  const filteredIds = (window.__lastFilteredIds && window.__lastFilteredIds['allotTbl']) || [];
+  if (checked) filteredIds.forEach(id => __selectedAllotIds.add(id));
+  else filteredIds.forEach(id => __selectedAllotIds.delete(id));
+  navigate('allotments');
+}
+function clearAllotSelection(){ __selectedAllotIds = new Set(); navigate('allotments'); }
+
+async function bulkUpdateAllotmentStatus(){
+  if (!__selectedAllotIds.size){ toast('No rows selected','warn'); return; }
+  const status = document.getElementById('bulkAllotStatusSelect').value;
+  let count = 0;
+  for (const id of __selectedAllotIds){
+    const a = findApp(id);
+    if (!a) continue;
+    const ipo = findIpo(a.ipoId);
+    const patch = { allotmentStatus: status, allotmentDate: ipo ? (ipo.allotmentDate || null) : null };
+    if (status === 'Not Allotted'){ patch.saleStatus = null; patch.saleDate = null; patch.saleAmount = null; }
+    else if (status === 'Allotted'){ if (a.saleStatus !== 'Sold') patch.saleStatus = 'Pending to Sell'; }
+    else { patch.saleStatus = null; }
+    const updated = { ...a, ...patch, updatedAt: new Date().toISOString() };
+    await putRec('applications', updated); Object.assign(a, updated);
+    await audit('Allotment Updates','Application', id, a, updated);
+    count++;
+  }
+  toast(`Allotment status updated for ${count} row(s)`, 'ok');
+  navigate('allotments');
+}
+async function bulkUpdateSaleDate(){
+  if (!__selectedAllotIds.size){ toast('No rows selected','warn'); return; }
+  const dateVal = document.getElementById('bulkSaleDateInput').value;
+  if (!dateVal){ toast('Pick a sale date first','warn'); return; }
+  let count = 0, skipped = 0;
+  for (const id of __selectedAllotIds){
+    const a = findApp(id);
+    if (!a || a.allotmentStatus !== 'Allotted'){ skipped++; continue; }
+    const updated = { ...a, saleDate: dateVal, saleStatus: 'Sold', updatedAt: new Date().toISOString() };
+    await putRec('applications', updated); Object.assign(a, updated);
+    await audit('Allotment Updates','Application', id, a, updated);
+    count++;
+  }
+  toast(`Sale date applied to ${count} row(s)${skipped?`, ${skipped} skipped (not Allotted)`:''}`, 'ok');
+  navigate('allotments');
+}
+
+function allotmentSaleModalBody(a){
+  const calc = calcAllotmentSale(a);
+  const ipo = findIpo(a.ipoId);
+  const saleSectionDisabled = a.allotmentStatus !== 'Allotted';
+  return `<div class="form-grid">
+      ${fieldHtml({key:'allotmentStatus',label:'Allotment Status',type:'select',options:ALLOTMENT_STATUSES,onchange:'onAllotmentStatusChange()'}, a.allotmentStatus||'Pending Decision')}
+      <div class="f-group"><label>Allotment Date</label><div class="small-muted" style="padding:8px 0;">${ipo && ipo.allotmentDate ? fmtDate(ipo.allotmentDate) : 'Not set on this IPO yet'} <span class="badge gray">Locked — set on the IPO</span></div></div>
+      <div class="f-group"><label>Sale Status</label><select id="fld_saleStatus" ${saleSectionDisabled?'disabled':''} onchange="onSaleStatusChange()">
+        <option value="">—</option>
+        ${SALE_STATUSES.map(s=>`<option value="${s}" ${a.saleStatus===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      ${fieldHtml({key:'saleDate',label:'Sale Date',type:'date'}, a.saleDate||'')}
+      ${fieldHtml({key:'saleAmount',label:'Sale Amount (total for the full allotted lot)',type:'number'}, a.saleAmount!=null?a.saleAmount:'')}
+    </div>
+    <div id="grossOurClientWrap" style="margin-top:14px;">${grossOurClientFieldsHtml(a, calc)}</div>
+    <p class="hint">Applied Amount: ${fmtMoney(a.amountApplied)}${a.applicationStatus!=='Applied'?'<br><b>Note:</b> allotment results are normally only entered once the application status is "Applied".':''}</p>`;
+}
+function grossOurClientFieldsHtml(a, calc){
+  return `<div class="form-grid">
+      ${fieldHtml({key:'grossReceived',label:'Gross Amount Received From Client',type:'number',hint:calc.applicable?`Calculated: ${fmtMoney(calc.calculatedGross)}`:'Applicable only once Allotted + Sold'}, (a.grossReceivedOverridden && a.grossReceived!=null) ? a.grossReceived : (calc.applicable?calc.calculatedGross:''))}
+      ${fieldHtml({key:'amountReceiveStatus',label:'Amount Receive Status',type:'select',options:['',...RECEIVE_STATUSES],placeholder:'—'}, a.amountReceiveStatus||'')}
+      ${fieldHtml({key:'ourProfit',label:'Our Profit',type:'number',hint:calc.applicable?`Calculated: ${fmtMoney(calc.calculatedOur)}`:'Gross Received − Applied Amount'}, (a.ourProfitOverridden && a.ourProfit!=null) ? a.ourProfit : (calc.applicable?calc.calculatedOur:''))}
+      ${fieldHtml({key:'clientProfit',label:'Client Profit',type:'number',hint:calc.applicable?`Calculated: ${fmtMoney(calc.calculatedClient)}`:'Sale Amount − Gross Received'}, (a.clientProfitOverridden && a.clientProfit!=null) ? a.clientProfit : (calc.applicable?calc.calculatedClient:''))}
+    </div>`;
+}
+function editAllotmentSale(id){
+  const a = findApp(id);
+  const c = findClient(a.clientId), i = findIpo(a.ipoId);
+  openModal(`Allotment &amp; Sale — ${escapeHtml(c?c.clientName:'')} · ${escapeHtml(i?i.ipoName:'')}`,
+    allotmentSaleModalBody(a),
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveAllotmentSale(${id})">Save</button>`, true);
+}
+function onAllotmentStatusChange(){
+  const status = document.getElementById('fld_allotmentStatus').value;
+  const saleSel = document.getElementById('fld_saleStatus');
+  if (status !== 'Allotted'){
+    saleSel.value = ''; saleSel.disabled = true;
+  } else {
+    saleSel.disabled = false;
+    if (!saleSel.value) saleSel.value = 'Pending to Sell';
+  }
+  onSaleStatusChange();
+}
+function onSaleStatusChange(){
+  // Gross/Our/Client Profit are (re)computed on save; nothing to do live here beyond enabling/disabling the Sale Status field, handled in onAllotmentStatusChange.
+}
+async function saveAllotmentSale(id, force){
+  const data = readFields([{key:'allotmentStatus'},{key:'saleStatus'},{key:'saleDate'},{key:'saleAmount',type:'number'},{key:'grossReceived',type:'number'},{key:'amountReceiveStatus'},{key:'ourProfit',type:'number'},{key:'clientProfit',type:'number'}]);
+  const a = findApp(id);
+  const ipo = findIpo(a.ipoId);
+  data.allotmentDate = ipo ? (ipo.allotmentDate || null) : null; // hard-locked to the IPO's allotment date
+
+  if ((data.allotmentStatus === 'Allotted' || data.allotmentStatus === 'Not Allotted') && a.applicationStatus !== 'Applied' && !force){
+    openModal('Validation Warning',
+      `<p style="font-size:13px;">Allotment results are normally only entered when Application Status is "Applied". This application is currently "${escapeHtml(a.applicationStatus)}".</p><p class="small-muted">You can still save.</p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="saveAllotmentSale(${id}, true)">Save Anyway</button>`);
+    return;
+  }
+
+  if (data.allotmentStatus === 'Not Allotted'){ data.saleStatus = null; data.saleDate = null; data.saleAmount = null; }
+  if (data.allotmentStatus !== 'Allotted'){ data.saleStatus = null; }
+  if (data.allotmentStatus === 'Allotted' && !data.saleStatus) data.saleStatus = 'Pending to Sell';
+  if (!data.amountReceiveStatus) data.amountReceiveStatus = null;
+
+  const warns = [];
+  if (data.saleStatus === 'Sold' && !data.saleDate) warns.push('Sale Date is required when Sale Status is Sold.');
+  if (data.saleDate && data.allotmentDate && data.saleDate < data.allotmentDate) warns.push('Sale date is before allotment date.');
+  if (data.allotmentDate && a.applicationDate && data.allotmentDate < a.applicationDate) warns.push('Allotment date (from the IPO) is before this application\u2019s application date.');
+  if (warns.length && !force){
+    openModal('Date / Status Warning', `<p style="font-size:13px;">${warns.join('<br>')}</p><p class="small-muted">You can still save.</p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="saveAllotmentSale(${id}, true)">Save Anyway</button>`);
+    return;
+  }
+
+  // detect manual overrides: user-entered value differs from the auto-calculated one
+  const probe = { ...a, ...data };
+  const calc = calcAllotmentSale({ ...probe, grossReceivedOverridden:false, ourProfitOverridden:false, clientProfitOverridden:false });
+  const grossReceivedOverridden = calc.applicable && isFilled(data.grossReceived) && Number(data.grossReceived) !== calc.calculatedGross;
+  const ourProfitOverridden = calc.applicable && isFilled(data.ourProfit) && Number(data.ourProfit) !== calc.calculatedOur;
+  const clientProfitOverridden = calc.applicable && isFilled(data.clientProfit) && Number(data.clientProfit) !== calc.calculatedClient;
+
+  const updated = { ...a, ...data,
+    grossReceivedOverridden, ourProfitOverridden, clientProfitOverridden,
+    calculatedGrossReceived: calc.applicable ? calc.calculatedGross : null,
+    calculatedOurProfit: calc.applicable ? calc.calculatedOur : null,
+    calculatedClientProfit: calc.applicable ? calc.calculatedClient : null,
+    updatedAt: new Date().toISOString() };
+  await putRec('applications', updated); Object.assign(a, updated);
+  await audit('Allotment Updates','Application', id, a, updated);
+  toast('Allotment / sale updated','ok');
+  closeModal(); navigate('allotments');
+}
+
+</script>
+<script>
+/* =================== DASHBOARD =================== */
+let dashRange = { preset:'thisMonth', from:null, to:null };
+
+function fyRange(offsetYears){
+  const now = new Date();
+  let fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear()-1;
+  fyStartYear -= offsetYears;
+  return { from: `${fyStartYear}-04-01`, to: `${fyStartYear+1}-03-31` };
+}
+function resolveDashRange(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const p = dashRange.preset;
+  if (p === 'today') return { from: todayStr(), to: todayStr() };
+  if (p === 'thisWeek'){
+    const dow = now.getDay();
+    const start = new Date(now); start.setDate(d - dow);
+    const end = new Date(start); end.setDate(start.getDate()+6);
+    return { from: isoDate(start), to: isoDate(end) };
+  }
+  if (p === 'thisMonth') return { from: isoDate(new Date(y,m,1)), to: isoDate(new Date(y,m+1,0)) };
+  if (p === 'prevMonth') return { from: isoDate(new Date(y,m-1,1)), to: isoDate(new Date(y,m,0)) };
+  if (p === 'thisFY') return fyRange(0);
+  if (p === 'prevFY') return fyRange(1);
+  if (p === 'custom') return { from: dashRange.from || '0001-01-01', to: dashRange.to || '9999-12-31' };
+  return { from: '0001-01-01', to: '9999-12-31' };
+}
+function inRange(dateStr, r){ return dateStr && dateStr >= r.from && dateStr <= r.to; }
+
+function viewDashboard(){
+  return `<div id="dashBody"></div>`;
+}
+function afterDashboard(){ document.getElementById('dashBody').innerHTML = dashboardBody(); }
+function setDashPreset(p){ dashRange.preset = p; render(); }
+function setDashCustom(){
+  dashRange.preset = 'custom';
+  dashRange.from = document.getElementById('dashFrom').value;
+  dashRange.to = document.getElementById('dashTo').value;
+  render();
+}
+
+function dashboardBody(){
+  const r = resolveDashRange();
+  const appsInRange = S.applications.filter(a => inRange(a.applicationDate, r));
+  const plansInRange = S.ipoPlans.filter(p => inRange(p.plannedDate, r));
+  const allottedInRange = S.applications.filter(a => inRange(a.allotmentDate, r));
+  const notAllottedInRange = allottedInRange.filter(a=>a.allotmentStatus==='Not Allotted');
+  const soldInRange = S.applications.filter(a => inRange(a.saleDate, r) && a.saleStatus==='Sold');
+  const profitInRange = soldInRange.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.ourFinal:0); }, 0);
+  const amountAppliedInRange = appsInRange.reduce((s,a)=>s+(Number(a.amountApplied)||0),0);
+  const grossInRange = soldInRange.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.grossFinal:0); },0);
+  const avgProfit = allottedInRange.filter(a=>a.allotmentStatus==='Allotted').length ? Math.round(profitInRange / allottedInRange.filter(a=>a.allotmentStatus==='Allotted').length) : 0;
+  const pendingToSell = S.applications.filter(a=>a.allotmentStatus==='Allotted' && a.saleStatus!=='Sold').length;
+  const upcomingIpos = S.ipos.filter(i=>ipoStatus(i)==='Upcoming').length;
+  const needPlanning = S.ipos.filter(i=>ipoStatus(i)!=='Closed' && upcomingPlanningStatus(i)==='Not Planned').length;
+
+  const presetBtns = [
+    ['today','Today'],['thisWeek','This Week'],['thisMonth','This Month'],['prevMonth','Previous Month'],
+    ['thisFY','Current FY'],['prevFY','Previous FY'],['custom','Custom']
+  ].map(([k,l]) => `<button class="btn btn-sm ${dashRange.preset===k?'btn-primary':'btn-ghost'}" onclick="setDashPreset('${k}')">${l}</button>`).join('');
+
+  const attn = buildAttentionList();
+  const attnHtml = attn.length ? attn.map(a=>`<div class="attn-item ${a.level}"><span class="tag">${a.level}</span><span>${a.text}</span></div>`).join('')
+    : `<div class="small-muted">Nothing needs attention right now.</div>`;
+
+  return `
+  <div class="section-card">
+    <div class="sc-body" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      ${presetBtns}
+      ${dashRange.preset==='custom' ? `<input type="date" id="dashFrom" value="${dashRange.from||''}" onchange="setDashCustom()"><span>to</span><input type="date" id="dashTo" value="${dashRange.to||''}" onchange="setDashCustom()">` : ''}
+      <span class="small-muted" style="margin-left:auto;">Showing: ${fmtDate(r.from)} – ${fmtDate(r.to)}</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="lbl">Total Clients</div><div class="val">${S.clients.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Total IPOs</div><div class="val">${S.ipos.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Applications (period)</div><div class="val">${appsInRange.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Allotments (period)</div><div class="val ok">${allottedInRange.filter(a=>a.allotmentStatus==='Allotted').length}</div></div>
+    <div class="kpi-card"><div class="lbl">Not Allotted (period)</div><div class="val danger">${notAllottedInRange.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Sold (period)</div><div class="val">${soldInRange.length}</div></div>
+    <div class="kpi-card"><div class="lbl">Amount Applied (period)</div><div class="val">${fmtMoney(amountAppliedInRange)}</div></div>
+    <div class="kpi-card"><div class="lbl">Gross Received (period)</div><div class="val">${fmtMoney(grossInRange)}</div></div>
+    <div class="kpi-card"><div class="lbl">Our Profit (period)</div><div class="val gold">${fmtMoney(profitInRange)}</div></div>
+    <div class="kpi-card"><div class="lbl">Avg Profit / Allotment</div><div class="val">${fmtMoney(avgProfit)}</div></div>
+    <div class="kpi-card"><div class="lbl">Pending to Sell</div><div class="val">${pendingToSell}</div></div>
+    <div class="kpi-card"><div class="lbl">Upcoming IPOs</div><div class="val">${upcomingIpos}</div></div>
+    <div class="kpi-card"><div class="lbl">IPOs Requiring Planning</div><div class="val danger">${needPlanning}</div></div>
+  </div>
+  <p class="small-muted">Date basis: Applications use Application Date · Planning uses Planned Date · Allotments use Allotment Date · Profit/Sales use Sale Date.</p>
+
+  <div class="section-card">
+    <div class="sc-head"><h3>What Needs Attention?</h3></div>
+    <div class="sc-body attn-list">${attnHtml}</div>
+  </div>
+
+  ${operationalDailyPlannerHtml()}
+  `;
+}
+
+function buildAttentionList(){
+  const items = [];
+  const today = todayStr();
+  const tomorrow = isoDate(new Date(Date.now()+86400000));
+  S.ipos.forEach(i=>{
+    if (i.openDate===today) items.push({level:'high', text:`IPO opening today: ${escapeHtml(i.ipoName)}`});
+    if (i.openDate===tomorrow) items.push({level:'med', text:`IPO opening tomorrow: ${escapeHtml(i.ipoName)}`});
+    if (i.closeDate===today) items.push({level:'high', text:`IPO closing today: ${escapeHtml(i.ipoName)}`});
+    if (i.closeDate===tomorrow) items.push({level:'med', text:`IPO closing tomorrow: ${escapeHtml(i.ipoName)}`});
+    if (ipoStatus(i)!=='Closed' && upcomingPlanningStatus(i)==='Not Planned') items.push({level:'med', text:`IPO not planned: ${escapeHtml(i.ipoName)}`});
+  });
+  S.bankAccounts.filter(b=>b.status==='Active').forEach(b=>{
+    const cap = bankCapacity(b.id, today);
+    if (cap.status==='Over Capacity') items.push({level:'high', text:`Bank capacity exceeded: ${escapeHtml(b.bankName)} today (${cap.planned}/6)`});
+    else if (cap.status==='Full' || cap.status==='Near Capacity') items.push({level:'med', text:`Bank capacity nearly full: ${escapeHtml(b.bankName)} today (${cap.planned}/6)`});
+  });
+  S.ipoPlans.forEach(p=>{ if (planVariance(p)==='Pending' && p.plannedDate < today) items.push({level:'med', text:`Planned application not yet executed: ${escapeHtml(findIpo(p.ipoId)?.ipoName||'')} (${fmtDate(p.plannedDate)})`}); });
+  S.applications.filter(a=>a.allotmentStatus==='Allotted' && a.saleStatus!=='Sold').forEach(a=>{ const c=findClient(a.clientId); items.push({level:'low', text:`Pending to sell: ${escapeHtml(c?c.clientName:'')} — ${escapeHtml(findIpo(a.ipoId)?.ipoName||'')}`}); });
+  const order = {high:0, med:1, low:2};
+  return items.sort((a,b)=>order[a.level]-order[b.level]).slice(0,20);
+}
+
+function operationalDailyPlannerHtml(){
+  const today = todayStr();
+  const activeBanks = S.bankAccounts.filter(b=>b.status==='Active');
+  const bankBlocks = activeBanks.map(b=>{
+    const cap = bankCapacity(b.id, today);
+    const list = cap.plans.map(p=>{ const ipo=findIpo(p.ipoId); return `<li>${escapeHtml(ipo?ipo.ipoName:'')}</li>`; }).join('');
+    return `<div style="margin-bottom:8px;"><b>${escapeHtml(b.bankName)}</b> — <span class="cap-cell ${capClass(cap.status)}">${cap.planned}/6</span>
+      ${list?`<ul style="margin:4px 0 0 18px;font-size:12px;">${list}</ul>`:'<div class="small-muted">No IPOs planned today</div>'}</div>`;
+  }).join('') || '<div class="small-muted">No active bank accounts.</div>';
+
+  const plannedClientsToday = S.ipoPlans.filter(p=>p.plannedDate===today).reduce((s,p)=>s+(S.plannedClients.filter(pc=>pc.planId===p.id).length),0);
+  const appsToday = S.applications.filter(a=>a.applicationDate===today).length;
+  const pendingToday = Math.max(0, plannedClientsToday - appsToday);
+
+  const closingToday = S.ipos.filter(i=>i.closeDate===today).length;
+  const fullBanks = activeBanks.filter(b=>bankCapacity(b.id,today).status!=='Available').length;
+  const notAppliedYet = plannedClientsToday - appsToday;
+
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Operational Daily Planner — ${fmtDate(today)}</h3></div>
+    <div class="sc-body">
+      <div class="form-grid">
+        <div><b>IPO Applications by Bank</b>${bankBlocks}</div>
+        <div>
+          <b>Client Work</b>
+          <ul style="margin:8px 0 0 18px;font-size:12.5px;line-height:1.8;">
+            <li>${plannedClientsToday} clients planned</li>
+            <li>${appsToday} applications completed</li>
+            <li>${pendingToday} pending</li>
+          </ul>
+          <b>Alerts</b>
+          <ul style="margin:8px 0 0 18px;font-size:12.5px;line-height:1.8;">
+            <li>${closingToday} IPO(s) closing today</li>
+            <li>${fullBanks} bank(s) at/near full capacity</li>
+            <li>${Math.max(0,notAppliedYet)} client(s) not yet applied</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+</script>
+<script>
+/* =================== REPORTS =================== */
+let reportsTab = 'client';
+function viewReports(){
+  return `
+  <div class="tabs">
+    <button class="${reportsTab==='client'?'active':''}" onclick="setReportsTab('client')">Client Analysis</button>
+    <button class="${reportsTab==='ipo'?'active':''}" onclick="setReportsTab('ipo')">IPO Analysis</button>
+    <button class="${reportsTab==='bank'?'active':''}" onclick="setReportsTab('bank')">Bank Analysis</button>
+    <button class="${reportsTab==='capacity'?'active':''}" onclick="setReportsTab('capacity')">Bank Capacity Analysis</button>
+    <button class="${reportsTab==='planning'?'active':''}" onclick="setReportsTab('planning')">Planning Performance</button>
+    <button class="${reportsTab==='pva'?'active':''}" onclick="setReportsTab('pva')">Planned vs Actual</button>
+  </div>
+  <div id="reportsTabBody">${reportsTabContent()}</div>`;
+}
+function setReportsTab(t){ reportsTab = t; render(); }
+function reportsTabContent(){
+  if (reportsTab==='client') return reportClientAnalysis();
+  if (reportsTab==='ipo') return reportIpoAnalysis();
+  if (reportsTab==='bank') return reportBankAnalysis();
+  if (reportsTab==='capacity') return planningCapacityTab();
+  if (reportsTab==='planning') return reportPlanningPerformance();
+  if (reportsTab==='pva') return planningVarianceTab();
+  return '';
+}
+function reportClientAnalysis(){
+  const rows = S.clients.map(c=>{
+    const st = clientStats(c.id);
+    return `<tr><td>${escapeHtml(c.clientName)}</td><td>${st.apps.length}</td><td>${st.allotted.length}</td><td>${st.notAllotted.length}</td><td>${st.sold.length}</td><td>${fmtMoney(st.amountApplied)}</td><td>${fmtMoney(st.grossReceived)}</td><td>${fmtMoney(st.profit)}</td><td>${fmtMoney(st.clientProfit)}</td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="9">No clients yet.</td></tr>`;
+  return `<div class="section-card"><div class="sc-body table-wrap"><table class="dt"><thead><tr><th>Client</th><th>Applications</th><th>Allotments</th><th>Not Allotted</th><th>Sold</th><th>Amount Applied</th><th>Gross Received</th><th>Our Profit</th><th>Client Profit</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function reportIpoAnalysis(){
+  const rows = S.ipos.map(i=>{
+    const st = ipoStats(i.id);
+    const notAllotted = st.apps.filter(a=>a.allotmentStatus==='Not Allotted').length;
+    const sold = st.apps.filter(a=>a.saleStatus==='Sold').length;
+    const amountApplied = st.apps.reduce((s,a)=>s+(Number(a.amountApplied)||0),0);
+    const gross = st.apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.grossFinal:0); },0);
+    return `<tr><td>${escapeHtml(i.ipoName)}</td><td>${st.apps.length}</td><td>${st.allotted.length}</td><td>${notAllotted}</td><td>${sold}</td><td>${fmtMoney(amountApplied)}</td><td>${fmtMoney(gross)}</td><td>${fmtMoney(st.profit)}</td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="8">No IPOs yet.</td></tr>`;
+  return `<div class="section-card"><div class="sc-body table-wrap"><table class="dt"><thead><tr><th>IPO</th><th>Applications</th><th>Allotments</th><th>Not Allotted</th><th>Sold</th><th>Amount Applied</th><th>Gross Received</th><th>Our Profit</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function reportBankAnalysis(){
+  const rows = S.bankAccounts.map(b=>{
+    const st = bankStats(b.id);
+    const actualIpoIds = new Set(st.apps.map(a=>a.ipoId));
+    const amountApplied = st.apps.reduce((s,a)=>s+(Number(a.amountApplied)||0),0);
+    const gross = st.apps.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.grossFinal:0); },0);
+    return `<tr><td>${escapeHtml(b.bankName)}</td><td>${st.plans.length}</td><td>${actualIpoIds.size}</td><td>${st.apps.length}</td><td>${st.apps.filter(a=>a.allotmentStatus==='Allotted').length}</td><td>${fmtMoney(amountApplied)}</td><td>${fmtMoney(gross)}</td><td>${fmtMoney(st.profit)}</td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="8">No bank accounts yet.</td></tr>`;
+  return `<div class="section-card"><div class="sc-body table-wrap"><table class="dt"><thead><tr><th>Bank</th><th>Planned IPOs</th><th>Actual IPOs</th><th>Applications</th><th>Allotments</th><th>Amount Applied</th><th>Gross Received</th><th>Our Profit</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function reportPlanningPerformance(){
+  const totalPlanned = S.ipoPlans.length;
+  const totalActual = new Set(S.applications.filter(a=>a.planId).map(a=>a.planId)).size;
+  const executed = S.ipoPlans.filter(p=>planVariance(p)==='Matched').length;
+  const notExecuted = S.ipoPlans.filter(p=>planVariance(p)==='Pending').length;
+  const bankChanged = S.ipoPlans.filter(p=>planVariance(p)==='Bank Changed').length;
+  const dateChanged = S.ipoPlans.filter(p=>planVariance(p)==='Date Changed').length;
+  const dateSet = new Set(S.ipoPlans.map(p=>p.plannedDate));
+  let overCapacityDays = 0, utilSum = 0, utilCount = 0;
+  S.bankAccounts.forEach(b=>{ dateSet.forEach(d=>{ const cap = bankCapacity(b.id,d); if (cap.planned>0){ utilSum += cap.utilisation; utilCount++; if (cap.status==='Over Capacity') overCapacityDays++; } }); });
+  const avgUtil = utilCount ? Math.round((utilSum/utilCount)*10)/10 : 0;
+  return `<div class="kpi-grid">
+    <div class="kpi-card"><div class="lbl">Total Planned IPO Slots</div><div class="val">${totalPlanned}</div></div>
+    <div class="kpi-card"><div class="lbl">Total Actual IPO Slots</div><div class="val">${totalActual}</div></div>
+    <div class="kpi-card"><div class="lbl">Plans Executed</div><div class="val ok">${executed}</div></div>
+    <div class="kpi-card"><div class="lbl">Plans Not Executed</div><div class="val danger">${notExecuted}</div></div>
+    <div class="kpi-card"><div class="lbl">Plans With Bank Change</div><div class="val">${bankChanged}</div></div>
+    <div class="kpi-card"><div class="lbl">Plans With Date Change</div><div class="val">${dateChanged}</div></div>
+    <div class="kpi-card"><div class="lbl">Over-Capacity Days</div><div class="val danger">${overCapacityDays}</div></div>
+    <div class="kpi-card"><div class="lbl">Average Bank Utilisation</div><div class="val">${avgUtil}%</div></div>
+  </div>`;
+}
+
+/* =================== SETTINGS =================== */
+function viewSettings(){
+  const refs = S.settings.references || [];
+  return `
+  <div class="section-card">
+    <div class="sc-head"><h3>Reference Names</h3></div>
+    <div class="sc-body">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        ${refs.map(r=>`<span class="badge blue" style="padding:5px 10px;">${escapeHtml(r)} <span style="cursor:pointer;margin-left:5px;" onclick="removeReference('${escapeHtml(r)}')">&times;</span></span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="newRefInput" placeholder="Add reference name" style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+        <button class="btn btn-primary btn-sm" onclick="addReference()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="sc-head"><h3>Cloud Storage</h3></div>
+    <div class="sc-body">
+      <p class="small-muted">Google Drive is the persistent source of truth for this portal's data. IndexedDB is kept as a local cache so the app keeps working offline; changes sync back to Drive automatically.</p>
+      ${window.__drive.signedIn ? `
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div><span class="small-muted">Google Drive</span><br><b class="badge green">Connected</b></div>
+          <div><span class="small-muted">Connected Account</span><br><b>${escapeHtml(window.__drive.email||S.settings.driveConnectedEmail||'—')}</b></div>
+          <div><span class="small-muted">Data File</span><br><b>${DRIVE_FILE_NAME}</b></div>
+          <div><span class="small-muted">Last Synced</span><br><b>${S.settings.lastSynced ? new Date(S.settings.lastSynced).toLocaleString('en-IN') : '—'}</b></div>
+        </div>
+        <div class="btn-row" style="justify-content:flex-start;">
+          <button class="btn btn-primary" onclick="syncToDrive()">Sync Now</button>
+          <button class="btn btn-ghost" onclick="refreshFromDrive()">Refresh From Google Drive</button>
+          <button class="btn btn-ghost" onclick="localBackupDownload()">Export Backup</button>
+          <button class="btn btn-danger" onclick="driveSignOut()">Sign Out</button>
+        </div>
+      ` : `
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div class="f-group span2"><label>Google OAuth Client ID</label><input type="text" id="driveClientId" value="${escapeHtml(S.settings.driveClientId||'')}" placeholder="xxxxxxx.apps.googleusercontent.com"></div>
+          ${S.settings.authorizedEmail ? `<div class="f-group span2"><label>Authorized Google Account</label><div class="small-muted">${escapeHtml(S.settings.authorizedEmail)} — only this account can sign in and access this portal's data.</div></div>` : `<div class="f-group span2"><label>Authorized Google Account</label><div class="small-muted">Not set yet — the first account that connects becomes the authorized account.</div></div>`}
+        </div>
+        <div class="btn-row" style="justify-content:flex-start;">
+          <button class="btn btn-ghost" onclick="saveDriveConfig()">Save Client ID</button>
+          <button class="btn btn-primary" onclick="driveConnect()">Connect Google Drive</button>
+        </div>
+      `}
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="sc-head"><h3>Local Backup</h3></div>
+    <div class="sc-body">
+      <p class="small-muted">Works fully offline — export/import a JSON snapshot of the entire database without Google Drive.</p>
+      <div class="btn-row" style="justify-content:flex-start;">
+        <button class="btn btn-ghost" onclick="localBackupDownload()">Download JSON Backup</button>
+        <label class="btn btn-ghost" style="display:inline-block;">Restore from File
+          <input type="file" accept=".json" style="display:none;" onchange="localBackupRestore(this.files[0])">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="sc-head"><h3>Audit Log</h3></div>
+    <div class="sc-body table-wrap" style="max-height:340px;overflow-y:auto;">
+      <table class="dt"><thead><tr><th>Timestamp</th><th>Action</th><th>Entity</th><th>Entity ID</th></tr></thead>
+      <tbody>${S.auditLogs.slice(0,200).map(l=>`<tr><td>${new Date(l.timestamp).toLocaleString('en-IN')}</td><td>${escapeHtml(l.action)}</td><td>${escapeHtml(l.entity)}</td><td>${escapeHtml(l.entityId)}</td></tr>`).join('') || '<tr class="empty-row"><td colspan="4">No activity yet.</td></tr>'}</tbody></table>
+    </div>
+  </div>`;
+}
+async function addReference(){
+  const input = document.getElementById('newRefInput');
+  const val = input.value.trim();
+  if (!val) return;
+  if (!S.settings.references.includes(val)) S.settings.references.push(val);
+  await saveSetting('references', S.settings.references);
+  navigate('settings');
+}
+async function removeReference(val){
+  S.settings.references = S.settings.references.filter(r=>r!==val);
+  await saveSetting('references', S.settings.references);
+  navigate('settings');
+}
+</script>
+<script>
+/* =================== EXCEL EXPORT =================== */
+function toExcelDate(str){ if(!str) return null; const d = new Date(str); if (isNaN(d)) return null; return d; }
+function exportAllToExcel(){
+  const wb = XLSX.utils.book_new();
+
+  const clientsSheet = S.clients.map(c=>({ 'Client ID':c.clientId, 'Client Name':c.clientName, 'Reference':c.referenceName, 'Sub Reference':c.subReference, 'Status':c.status, 'Date Added': toExcelDate(c.createdAt) }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientsSheet), 'Clients');
+
+  const banksSheet = S.bankAccounts.map(b=>({ 'Bank ID':b.bankId, 'Bank Name':b.bankName, 'Account Holder':b.accountHolderName, 'Status':b.status, 'UPI IDs': bankUpis(b.id).map(u=>u.upiId).join(', ') }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(banksSheet), 'Bank Accounts');
+
+  const upiSheet = S.bankUpiIds.map(u=>{ const b=findBank(u.bankAccountId); return { 'Bank':b?b.bankName:'', 'UPI ID':u.upiId }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(upiSheet), 'Bank UPI IDs');
+
+  const iposSheet = S.ipos.map(i=>({ 'IPO ID':i.ipoId, 'IPO Name':i.ipoName, 'Min Amount':Number(i.minimumApplicationAmount)||0, 'Open Date':toExcelDate(i.openDate), 'Close Date':toExcelDate(i.closeDate), 'Allotment Date':toExcelDate(i.allotmentDate), 'Status':ipoStatus(i) }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(iposSheet), 'IPOs');
+
+  const plansSheet = S.ipoPlans.map(p=>{ const ipo=findIpo(p.ipoId), bank=findBank(p.bankAccountId); return { 'Plan ID':p.id, 'IPO':ipo?ipo.ipoName:'', 'Planned Date':toExcelDate(p.plannedDate), 'Bank':bank?bank.bankName:'', 'Planned Clients':p.plannedClientCount||0, 'Status':planStatusComputed(p), 'Variance':planVariance(p), 'Notes':p.notes||'' }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(plansSheet), 'IPO Plans');
+
+  const plannedClientsSheet = S.plannedClients.map(pc=>{ const c=findClient(pc.clientId), plan=findPlan(pc.planId), ipo=plan?findIpo(plan.ipoId):null; return { 'Plan ID':pc.planId, 'IPO':ipo?ipo.ipoName:'', 'Client ID':c?c.clientId:'', 'Client Name':c?c.clientName:'' }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(plannedClientsSheet), 'Planned Clients');
+
+  const appsSheet = S.applications.map(a=>{ const c=findClient(a.clientId), i=findIpo(a.ipoId), b=findBank(a.bankAccountId); const u=S.bankUpiIds.find(x=>x.id===a.upiId); const calc=calcAllotmentSale(a); return {
+    'Application ID':a.id,'Client ID':c?c.clientId:'','Client Name':c?c.clientName:'','IPO':i?i.ipoName:'','Bank':b?b.bankName:'','Application Date':toExcelDate(a.applicationDate),
+    'UPI ID':u?u.upiId:'','Amount Applied':Number(a.amountApplied)||0,'Status':a.applicationStatus,'Plan ID':a.planId||'','Allotment Status':a.allotmentStatus||'',
+    'Allotment Date':toExcelDate(a.allotmentDate),'Sale Status':a.saleStatus||'','Sale Date':toExcelDate(a.saleDate),'Sale Amount':Number(a.saleAmount)||0,
+    'Gross Received':calc.applicable?calc.grossFinal:'','Amount Receive Status':a.amountReceiveStatus||'','Our Profit':calc.applicable?calc.ourFinal:'','Client Profit':calc.applicable?calc.clientFinal:'' }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(appsSheet), 'Applications');
+
+  const allotmentsSheet = S.applications.filter(a=>a.allotmentStatus && a.allotmentStatus!=='Pending Decision').map(a=>{ const c=findClient(a.clientId), i=findIpo(a.ipoId); return { 'Client':c?c.clientName:'','IPO':i?i.ipoName:'','Allotment Status':a.allotmentStatus,'Allotment Date':toExcelDate(a.allotmentDate) }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allotmentsSheet), 'Allotments');
+
+  const salesSheet = S.applications.filter(a=>a.saleStatus==='Sold').map(a=>{ const c=findClient(a.clientId), i=findIpo(a.ipoId); const calc=calcAllotmentSale(a); return { 'Client':c?c.clientName:'','IPO':i?i.ipoName:'','Sale Date':toExcelDate(a.saleDate),'Sale Amount':Number(a.saleAmount)||0,'Gross Received':calc.applicable?calc.grossFinal:'','Amount Applied':Number(a.amountApplied)||0,'Our Profit':calc.applicable?calc.ourFinal:'','Client Profit':calc.applicable?calc.clientFinal:'' }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesSheet), 'Sales');
+
+  const profitSummary = [{
+    'Total Amount Applied': S.applications.reduce((s,a)=>s+(Number(a.amountApplied)||0),0),
+    'Total Gross Received': S.applications.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.grossFinal:0); },0),
+    'Total Our Profit': S.applications.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.ourFinal:0); },0),
+    'Total Client Profit': S.applications.reduce((s,a)=>{ const c=calcAllotmentSale(a); return s+(c.applicable?c.clientFinal:0); },0)
+  }];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profitSummary), 'Profit Summary');
+
+  const clientSummary = S.clients.map(c=>{ const st=clientStats(c.id); return { 'Client':c.clientName,'Applications':st.apps.length,'Allotments':st.allotted.length,'Sold':st.sold.length,'Amount Applied':st.amountApplied,'Gross Received':st.grossReceived,'Our Profit':st.profit }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientSummary), 'Client Summary');
+
+  const ipoSummary = S.ipos.map(i=>{ const st=ipoStats(i.id); return { 'IPO':i.ipoName,'Applications':st.apps.length,'Allotments':st.allotted.length,'Our Profit':st.profit }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ipoSummary), 'IPO Summary');
+
+  const bankSummary = S.bankAccounts.map(b=>{ const st=bankStats(b.id); return { 'Bank':b.bankName,'Plans':st.plans.length,'Applications':st.apps.length,'Our Profit':st.profit }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bankSummary), 'Bank Summary');
+
+  const planningAnalysisSheet = S.ipoPlans.map(p=>{ const ipo=findIpo(p.ipoId), bank=findBank(p.bankAccountId); return { 'IPO':ipo?ipo.ipoName:'','Planned Date':toExcelDate(p.plannedDate),'Bank':bank?bank.bankName:'','Planned Clients':p.plannedClientCount||0,'Variance':planVariance(p) }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(planningAnalysisSheet), 'Planning Analysis');
+
+  const auditSheet = S.auditLogs.map(l=>({ 'Timestamp':l.timestamp,'Action':l.action,'Entity':l.entity,'Entity ID':l.entityId }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(auditSheet), 'Audit Logs');
+
+  XLSX.writeFile(wb, `IPO_Portal_Export_${todayStr()}.xlsx`);
+  toast('Excel export downloaded','ok');
+}
+
+/* =================== LOCAL BACKUP (JSON) =================== */
+function snapshotData(){
+  return {
+    version: DB_VERSION, exportedAt: new Date().toISOString(),
+    clients: S.clients, bankAccounts: S.bankAccounts, ipos: S.ipos, ipoPlans: S.ipoPlans,
+    plannedClients: S.plannedClients, applications: S.applications, bankUpiIds: S.bankUpiIds,
+    settings: S.settings, auditLogs: S.auditLogs
+  };
+}
+function localBackupDownload(){
+  const blob = new Blob([JSON.stringify(snapshotData(), null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `ipo_portal_backup_${todayStr()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded','ok');
+}
+async function restoreSnapshot(data){
+  for (const [store, keyPath] of Object.entries(STORES)){
+    if (store === 'settings') continue;
+    await clearStore(store);
+    const arr = data[store] || [];
+    for (const rec of arr) await putRec(store, rec);
+  }
+  if (data.settings){
+    for (const [k,v] of Object.entries(data.settings)) await saveSetting(k, v);
+  }
+  await loadAll();
+}
+function localBackupRestore(file){
+  if (!file) return;
+  confirmAction('Restoring will replace all current data with the contents of this backup file. Continue?', () => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        await restoreSnapshot(data);
+        await saveSetting('lastRestore', new Date().toISOString());
+        toast('Backup restored','ok');
+        navigate('dashboard');
+      } catch(err){ toast('Invalid backup file','danger'); }
+    };
+    reader.readAsText(file);
+  });
+}
+
+/* =================== GOOGLE DRIVE — SOURCE OF TRUTH, INDEXEDDB AS LOCAL CACHE =================== */
+const DRIVE_FOLDER_NAME = 'IPO Management Portal';
+const DRIVE_FILE_NAME = 'ipo_management_portal_data.json';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+window.__drive = {
+  signedIn: false, email: null, accessToken: null,
+  folderId: null, fileId: null, remoteModifiedTime: null,
+  status: 'idle', // idle | saving | syncing | offline | conflict | error | denied
+  pendingChanges: false, syncTimer: null
+};
+
+function loadGis(){
+  return new Promise((resolve) => {
+    if (window.google && window.google.accounts) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = resolve;
+    s.onerror = resolve;
+    document.head.appendChild(s);
+  });
+}
+function setDriveStatus(status){
+  window.__drive.status = status;
+  renderSyncIndicator();
+  if (S.view === 'settings') { const b = document.getElementById('contentSettingsRerenderHook'); if (b) navigate('settings'); }
+}
+function renderSyncIndicator(){
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+  const labels = {
+    idle: window.__drive.signedIn ? 'Saved to Google Drive' : '',
+    saving: 'Saving...', syncing: 'Syncing...', offline: 'Offline — changes will sync when connection is restored',
+    conflict: 'Data updated elsewhere — refresh to continue', error: 'Sync failed — Retry', denied: 'Access Denied'
+  };
+  const text = labels[window.__drive.status] || '';
+  el.textContent = text;
+  el.style.display = text ? 'inline-block' : 'none';
+  el.className = 'badge ' + ({idle:'green',saving:'gold',syncing:'gold',offline:'gray',conflict:'red',error:'red',denied:'red'}[window.__drive.status] || 'gray');
+  el.onclick = (window.__drive.status==='error') ? syncToDrive : (window.__drive.status==='conflict' ? refreshFromDrive : null);
+  el.style.cursor = el.onclick ? 'pointer' : 'default';
+}
+
+/* ---- centralized sync trigger: called after every real data mutation via audit() ---- */
+function scheduleSync(){
+  if (!window.__drive.signedIn) return;
+  window.__drive.pendingChanges = true;
+  if (!navigator.onLine){ setDriveStatus('offline'); return; }
+  setDriveStatus('saving');
+  if (window.__drive.syncTimer) clearTimeout(window.__drive.syncTimer);
+  window.__drive.syncTimer = setTimeout(() => { syncToDrive(); }, 1200);
+}
+window.addEventListener('online', () => { if (window.__drive.signedIn && window.__drive.pendingChanges) syncToDrive(); });
+window.addEventListener('offline', () => { if (window.__drive.signedIn) setDriveStatus('offline'); });
+
+async function driveConnect(){
+  await loadGis();
+  if (!window.google || !window.google.accounts){ toast('Could not load Google Identity Services (check network/connectivity)','danger'); return; }
+  await loadGoogleClientId();
+  const clientId = S.settings.driveClientId;
+  if (!clientId){ toast('Enter a Google OAuth Client ID in Settings first','warn'); return; }
+  const tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: DRIVE_SCOPE + ' https://www.googleapis.com/auth/userinfo.email',
+    callback: async (resp) => {
+      if (!resp || !resp.access_token){ toast('Google Drive connection failed','danger'); return; }
+      window.__drive.accessToken = resp.access_token;
+      await driveVerifyAndBootstrap();
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+async function loadGoogleClientId(){ /* placeholder for symmetry — client id comes from Settings input */ }
+
+async function driveVerifyAndBootstrap(){
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${window.__drive.accessToken}` } });
+    const info = await res.json();
+    const email = (info.email || '').toLowerCase();
+    const authorized = (S.settings.authorizedEmail || '').toLowerCase();
+    if (authorized && email !== authorized){
+      setDriveStatus('denied');
+      openModal('Access Denied',
+        `<p style="font-size:13px;">Access Denied — This Google account is not authorized to use the IPO Management Portal.</p>
+         <p class="small-muted">Signed in as ${escapeHtml(info.email||'')}. Authorized account: ${escapeHtml(S.settings.authorizedEmail)}.</p>`,
+        `<button class="btn btn-primary" onclick="closeModal()">OK</button>`);
+      window.__drive.accessToken = null;
+      window.__drive.signedIn = false;
+      return;
+    }
+    if (!authorized){ await saveSetting('authorizedEmail', email); }
+    window.__drive.email = info.email;
+    window.__drive.signedIn = true;
+    await saveSetting('driveConnectedEmail', info.email);
+    toast('Google Drive connected — this account is now the authorized account for this portal','ok');
+    await driveBootstrapFolderAndFile();
+    navigate('settings');
+  } catch(err){ toast('Google Drive sign-in failed','danger'); }
+}
+
+async function driveApi(url, opts={}){
+  const res = await fetch(url, { ...opts, headers: { ...(opts.headers||{}), Authorization: `Bearer ${window.__drive.accessToken}` } });
+  if (!res.ok) throw new Error('Drive API error ' + res.status);
+  return res;
+}
+async function driveFindFolder(){
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+  const json = await res.json();
+  return (json.files && json.files[0]) || null;
+}
+async function driveCreateFolder(){
+  const res = await driveApi('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  return await res.json();
+}
+async function driveFindFile(folderId){
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and '${folderId}' in parents and trashed=false`);
+  const res = await driveApi(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)`);
+  const json = await res.json();
+  return (json.files && json.files[0]) || null;
+}
+async function driveCreateFile(folderId){
+  const metadata = { name: DRIVE_FILE_NAME, parents: [folderId], mimeType: 'application/json' };
+  const boundary = '-------ipoportal' + Date.now();
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(snapshotData())}\r\n--${boundary}--`;
+  const res = await driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime', {
+    method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body
+  });
+  return await res.json();
+}
+async function driveBootstrapFolderAndFile(){
+  setDriveStatus('syncing');
+  let folder = S.settings.driveFolderId ? { id: S.settings.driveFolderId } : await driveFindFolder();
+  if (!folder){ folder = await driveCreateFolder(); }
+  window.__drive.folderId = folder.id;
+  await saveSetting('driveFolderId', folder.id);
+
+  let file = S.settings.driveFileId ? await driveGetFileMeta(S.settings.driveFileId).catch(()=>null) : null;
+  if (!file) file = await driveFindFile(folder.id);
+  if (!file){ file = await driveCreateFile(folder.id); }
+  window.__drive.fileId = file.id;
+  window.__drive.remoteModifiedTime = file.modifiedTime || null;
+  await saveSetting('driveFileId', file.id);
+
+  await refreshFromDrive(true);
+  setDriveStatus('idle');
+}
+async function driveGetFileMeta(fileId){
+  const res = await driveApi(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,modifiedTime,trashed`);
+  const json = await res.json();
+  if (json.trashed) throw new Error('trashed');
+  return json;
+}
+
+async function syncToDrive(){
+  if (!window.__drive.signedIn || !window.__drive.fileId) return;
+  if (!navigator.onLine){ setDriveStatus('offline'); return; }
+  setDriveStatus('syncing');
+  try {
+    // conflict check: has the remote file changed since we last knew about it?
+    const meta = await driveGetFileMeta(window.__drive.fileId);
+    if (window.__drive.remoteModifiedTime && meta.modifiedTime !== window.__drive.remoteModifiedTime){
+      setDriveStatus('conflict');
+      toast('Data was updated from another device. Please refresh the latest data before continuing.','warn');
+      return;
+    }
+    const res = await driveApi(`https://www.googleapis.com/upload/drive/v3/files/${window.__drive.fileId}?uploadType=media&fields=id,modifiedTime`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshotData())
+    });
+    const json = await res.json();
+    window.__drive.remoteModifiedTime = json.modifiedTime || meta.modifiedTime;
+    window.__drive.pendingChanges = false;
+    await saveSetting('lastSynced', new Date().toISOString());
+    setDriveStatus('idle');
+  } catch(err){
+    setDriveStatus('error');
+  }
+}
+async function refreshFromDrive(silent){
+  if (!window.__drive.signedIn || !window.__drive.fileId){ toast('Connect Google Drive first','warn'); return; }
+  const doRefresh = async () => {
+    setDriveStatus('syncing');
+    try {
+      const meta = await driveGetFileMeta(window.__drive.fileId);
+      const res = await driveApi(`https://www.googleapis.com/drive/v3/files/${window.__drive.fileId}?alt=media`);
+      const data = await res.json();
+      await restoreSnapshot(data);
+      window.__drive.remoteModifiedTime = meta.modifiedTime;
+      window.__drive.pendingChanges = false;
+      await saveSetting('lastSynced', new Date().toISOString());
+      setDriveStatus('idle');
+      if (!silent){ toast('Refreshed from Google Drive','ok'); navigate('dashboard'); }
+    } catch(err){ setDriveStatus('error'); if (!silent) toast('Could not refresh from Google Drive','danger'); }
+  };
+  if (silent) { await doRefresh(); return; }
+  confirmAction('This will replace your local working copy with the latest data from Google Drive. Continue?', doRefresh);
+}
+function driveSignOut(){
+  window.__drive.signedIn = false;
+  window.__drive.accessToken = null;
+  window.__drive.email = null;
+  setDriveStatus('idle');
+  const el = document.getElementById('syncIndicator'); if (el) el.style.display = 'none';
+  toast('Signed out of Google Drive. Your data on Drive has not been changed.','ok');
+  navigate('settings');
+}
+async function saveDriveConfig(){
+  await saveSetting('driveClientId', document.getElementById('driveClientId').value.trim());
+  toast('Google Drive configuration saved','ok');
+}
+</script>
+<script>
+/* =================== INIT =================== */
+async function init(){
+  try {
+    await openDB();
+    await loadAll();
+    renderNav();
+    navigate('dashboard');
+    renderSyncIndicator();
+    if (!navigator.onLine) setDriveStatus('offline');
+  } catch(err){
+    console.error('Portal failed to initialize:', err);
+    document.getElementById('content').innerHTML =
+      `<div class="section-card"><div class="sc-body">
+         <h3 style="color:var(--danger);margin-top:0;">The portal failed to load</h3>
+         <p style="font-size:13px;">${escapeHtml(err && err.message ? err.message : String(err))}</p>
+         <p class="small-muted">Try reloading the page. If this keeps happening, your browser may have an older cached copy of the local database — clearing this site's storage (Application → IndexedDB → ipoPortalDB → Delete, in browser dev tools) and reloading will rebuild it from scratch.</p>
+       </div></div>`;
+  }
+}
+window.addEventListener('error', (e) => {
+  const c = document.getElementById('content');
+  if (c && !c.innerHTML.trim()) {
+    c.innerHTML = `<div class="section-card"><div class="sc-body"><h3 style="color:var(--danger);margin-top:0;">Something went wrong</h3><p style="font-size:13px;">${escapeHtml(e.message||'Unknown error')}</p></div></div>`;
+  }
+});
+init();
+</script>
+</body>
+</html>
