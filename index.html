@@ -2155,7 +2155,7 @@ function viewSettings(){
   <div class="section-card">
     <div class="sc-head"><h3>Cloud Storage</h3></div>
     <div class="sc-body">
-      <p class="small-muted">Google Drive is the persistent source of truth for this portal's data. IndexedDB is kept as a local cache so the app keeps working offline; changes sync back to Drive automatically.</p>
+      <p class="small-muted">Google Drive is the persistent source of truth for this portal's data. IndexedDB is kept as a local cache so the app keeps working offline; changes sync back to Drive automatically, and other connected devices check for updates roughly every 20 seconds (and immediately whenever you switch back to this tab).</p>
       ${window.__drive.signedIn ? `
         <div class="form-grid" style="margin-bottom:14px;">
           <div><span class="small-muted">Google Drive</span><br><b class="badge green">Connected</b></div>
@@ -2335,7 +2335,7 @@ window.__drive = {
   signedIn: false, email: null, accessToken: null,
   folderId: null, fileId: null, remoteModifiedTime: null,
   status: 'idle', // idle | saving | syncing | offline | conflict | error | denied
-  pendingChanges: false, syncTimer: null
+  pendingChanges: false, syncTimer: null, pollTimer: null
 };
 
 function loadGis(){
@@ -2387,20 +2387,43 @@ async function driveConnect(){
   await loadGoogleClientId();
   const clientId = S.settings.driveClientId;
   if (!clientId){ toast('Enter a Google OAuth Client ID in Settings first','warn'); return; }
+  requestDriveToken(clientId, false);
+}
+async function loadGoogleClientId(){ /* placeholder for symmetry — client id comes from Settings input */ }
+
+/* silent=true is used for auto-reconnect on page load / device switch: no popups, fails quietly */
+function requestDriveToken(clientId, silent){
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: DRIVE_SCOPE + ' https://www.googleapis.com/auth/userinfo.email',
     callback: async (resp) => {
-      if (!resp || !resp.access_token){ toast('Google Drive connection failed','danger'); return; }
+      if (!resp || !resp.access_token){
+        if (!silent) toast('Google Drive connection failed','danger');
+        return;
+      }
       window.__drive.accessToken = resp.access_token;
-      await driveVerifyAndBootstrap();
-    }
+      await driveVerifyAndBootstrap(silent);
+    },
+    error_callback: () => { /* silent auto-reconnect failed (e.g. needs interaction) — user can click Connect manually */ }
   });
-  tokenClient.requestAccessToken();
+  tokenClient.requestAccessToken(silent ? { prompt: 'none' } : {});
 }
-async function loadGoogleClientId(){ /* placeholder for symmetry — client id comes from Settings input */ }
 
-async function driveVerifyAndBootstrap(){
+/* Called once on every page load. If this device previously connected to Drive,
+   try to silently re-establish the session so the user doesn't have to click
+   "Connect Google Drive" every single time they open the app on a device. */
+async function driveAutoReconnect(){
+  try {
+    const clientId = S.settings.driveClientId;
+    const knownEmail = S.settings.driveConnectedEmail;
+    if (!clientId || !knownEmail) return;
+    await loadGis();
+    if (!window.google || !window.google.accounts) return;
+    requestDriveToken(clientId, true);
+  } catch(err){ /* silent — user can always connect manually from Settings */ }
+}
+
+async function driveVerifyAndBootstrap(silent){
   try {
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${window.__drive.accessToken}` } });
     const info = await res.json();
@@ -2408,10 +2431,12 @@ async function driveVerifyAndBootstrap(){
     const authorized = (S.settings.authorizedEmail || '').toLowerCase();
     if (authorized && email !== authorized){
       setDriveStatus('denied');
-      openModal('Access Denied',
-        `<p style="font-size:13px;">Access Denied — This Google account is not authorized to use the IPO Management Portal.</p>
-         <p class="small-muted">Signed in as ${escapeHtml(info.email||'')}. Authorized account: ${escapeHtml(S.settings.authorizedEmail)}.</p>`,
-        `<button class="btn btn-primary" onclick="closeModal()">OK</button>`);
+      if (!silent){
+        openModal('Access Denied',
+          `<p style="font-size:13px;">Access Denied — This Google account is not authorized to use the IPO Management Portal.</p>
+           <p class="small-muted">Signed in as ${escapeHtml(info.email||'')}. Authorized account: ${escapeHtml(S.settings.authorizedEmail)}.</p>`,
+          `<button class="btn btn-primary" onclick="closeModal()">OK</button>`);
+      }
       window.__drive.accessToken = null;
       window.__drive.signedIn = false;
       return;
@@ -2420,10 +2445,37 @@ async function driveVerifyAndBootstrap(){
     window.__drive.email = info.email;
     window.__drive.signedIn = true;
     await saveSetting('driveConnectedEmail', info.email);
-    toast('Google Drive connected — this account is now the authorized account for this portal','ok');
+    if (!silent){ toast('Google Drive connected — this account is now the authorized account for this portal','ok'); }
     await driveBootstrapFolderAndFile();
-    navigate('settings');
-  } catch(err){ toast('Google Drive sign-in failed','danger'); }
+    startDrivePolling();
+    if (!silent) navigate('settings');
+  } catch(err){ if (!silent) toast('Google Drive sign-in failed','danger'); }
+}
+
+/* ---- cross-device auto-pull: periodically check if the Drive file changed
+   elsewhere (e.g. edited on another device) and pull it in automatically ---- */
+function startDrivePolling(){
+  stopDrivePolling();
+  window.__drive.pollTimer = setInterval(checkRemoteChanges, 20000);
+  document.addEventListener('visibilitychange', onVisibilityCheckRemote);
+}
+function stopDrivePolling(){
+  if (window.__drive.pollTimer){ clearInterval(window.__drive.pollTimer); window.__drive.pollTimer = null; }
+  document.removeEventListener('visibilitychange', onVisibilityCheckRemote);
+}
+function onVisibilityCheckRemote(){
+  if (document.visibilityState === 'visible') checkRemoteChanges();
+}
+async function checkRemoteChanges(){
+  if (!window.__drive.signedIn || !window.__drive.fileId) return;
+  if (window.__drive.pendingChanges) return; // don't pull over unsaved local edits — let the push finish first
+  if (!navigator.onLine) return;
+  try {
+    const meta = await driveGetFileMeta(window.__drive.fileId);
+    if (window.__drive.remoteModifiedTime && meta.modifiedTime !== window.__drive.remoteModifiedTime){
+      await refreshFromDrive(true);
+    }
+  } catch(err){ /* transient network/API hiccup during background polling — ignore, next poll retries */ }
 }
 
 async function driveApi(url, opts={}){
@@ -2529,6 +2581,7 @@ async function refreshFromDrive(silent){
   confirmAction('This will replace your local working copy with the latest data from Google Drive. Continue?', doRefresh);
 }
 function driveSignOut(){
+  stopDrivePolling();
   window.__drive.signedIn = false;
   window.__drive.accessToken = null;
   window.__drive.email = null;
@@ -2552,6 +2605,7 @@ async function init(){
     navigate('dashboard');
     renderSyncIndicator();
     if (!navigator.onLine) setDriveStatus('offline');
+    driveAutoReconnect(); // silent — reconnects this device to Drive and starts cross-device auto-sync if previously connected
   } catch(err){
     console.error('Portal failed to initialize:', err);
     document.getElementById('content').innerHTML =
