@@ -2985,26 +2985,32 @@ function downloadImportTemplate(){
   toast('Template downloaded — fill it in and use Import below','ok');
 }
 
-function dateToIsoUTC(d){
-  // Don't assume which convention produced this Date object — check which
-  // representation (UTC or local) is actually midnight, and read from that one.
-  // This matters because SheetJS's cellDates:true output and a manually-typed
-  // date string aren't guaranteed to be built the same way, and guessing wrong
-  // is exactly what caused dates to shift by a day in the first place.
-  if (d.getUTCHours()===0 && d.getUTCMinutes()===0 && d.getUTCSeconds()===0 && d.getUTCMilliseconds()===0){
-    const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
-  }
-  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+function excelSerialToIso(serial){
+  // Standard Excel-serial-to-calendar-date conversion, done entirely in UTC
+  // math. This deliberately avoids depending on how any library constructs
+  // JS Date objects internally (that ambiguity is what caused the date to
+  // shift by a day) — a serial number is just a number, so there's nothing
+  // to get wrong about timezone or local-vs-UTC here.
+  const utcDays = Math.floor(serial - 25569); // 25569 = days between 1899-12-30 and 1970-01-01
+  const d = new Date(utcDays * 86400 * 1000);
+  const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
 function parseExcelDate(val){
   if (val===null || val===undefined || val==='') return null;
-  if (val instanceof Date) return isNaN(val) ? null : dateToIsoUTC(val);
+  if (typeof val === 'number') return excelSerialToIso(val);
+  if (val instanceof Date){
+    // Fallback only — shouldn't normally be hit now that we read raw values,
+    // but handled defensively in case a cell already comes through as a Date.
+    if (val.getUTCHours()===0 && val.getUTCMinutes()===0 && val.getUTCSeconds()===0){
+      return `${val.getUTCFullYear()}-${String(val.getUTCMonth()+1).padStart(2,'0')}-${String(val.getUTCDate()).padStart(2,'0')}`;
+    }
+    return `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,'0')}-${String(val.getDate()).padStart(2,'0')}`;
+  }
   const s = String(val).trim();
   // dd/mm/yyyy or dd-mm-yyyy (common in India) — construct in UTC, not local time
   const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) return dateToIsoUTC(new Date(Date.UTC(Number(dmy[3]), Number(dmy[2])-1, Number(dmy[1]))));
+  if (dmy) return excelSerialToIso(Math.floor((Date.UTC(Number(dmy[3]), Number(dmy[2])-1, Number(dmy[1])) - Date.UTC(1899,11,30)) / 86400000));
   // yyyy-mm-dd — extract directly rather than round-tripping through Date parsing
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return `${iso[1]}-${String(iso[2]).padStart(2,'0')}-${String(iso[3]).padStart(2,'0')}`;
@@ -3022,7 +3028,7 @@ function importFromExcel(file){
   const reader = new FileReader();
   reader.onload = (e) => {
     let wb;
-    try { wb = XLSX.read(e.target.result, { type:'array', cellDates:true }); }
+    try { wb = XLSX.read(e.target.result, { type:'array', cellDates:false }); }
     catch(err){ toast('Could not read this file — make sure it\'s a valid .xlsx file','danger'); return; }
 
     const ipoRows = wb.Sheets['IPOs'] ? XLSX.utils.sheet_to_json(wb.Sheets['IPOs'], { defval:'' }) : [];
