@@ -667,21 +667,16 @@ function confirmAction(msg, onYes){
   document.getElementById('confirmYesBtn').onclick = () => { closeModal(); onYes(); };
 }
 
-/* Safe-deletion helper: when a record has dependent historical data, this
-   blocks a silent permanent delete and instead offers Deactivate as the safe
-   default — matching the app-wide rule that historical financial records
-   should never disappear just because someone clicked Delete once. Records
-   with zero dependents skip straight to a normal delete confirmation. */
-function confirmDangerousDelete({ warningHtml, onDeactivate, onDelete }){
-  if (onDeactivate){
-    openModal('Delete?',
-      `<p style="font-size:13px;line-height:1.5;">${warningHtml}</p>`,
-      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-       <button class="btn btn-primary" id="confirmDeactivateBtn">Deactivate Instead</button>`);
-    document.getElementById('confirmDeactivateBtn').onclick = () => { closeModal(); onDeactivate(); };
-  } else {
-    confirmAction(warningHtml, onDelete);
-  }
+
+/* Safe-deletion helper: shows exactly what will be lost (counts, amounts) before
+   a delete with dependent records proceeds, so nothing disappears from one
+   accidental click without the person seeing what's actually at stake first. */
+function confirmDangerousDelete({ warningHtml, onDelete }){
+  openModal('Delete?',
+    `<p style="font-size:13px;line-height:1.5;">${warningHtml}</p>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-danger" id="confirmDangerDeleteBtn">Delete</button>`);
+  document.getElementById('confirmDangerDeleteBtn').onclick = () => { closeModal(); onDelete(); };
 }
 
 // ---- generic field builder ----
@@ -933,13 +928,12 @@ function deleteClient(id){
   const stats = clientStats(id);
   if (stats.apps.length){
     confirmDangerousDelete({
-      warningHtml: `This client (${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)}) has ${stats.apps.length} associated application(s) and ${stats.allotted.length + stats.sold.length} completed transaction(s). Deleting it may affect historical reporting.`,
-      onDeactivate: async () => {
-        const updated = { ...c, status:'Inactive', updatedAt: new Date().toISOString() };
-        await putRec('clients', updated);
-        Object.assign(c, updated);
-        await audit('Client Deactivated','Client', c.clientId, c, updated);
-        toast('Client deactivated — historical records kept intact','ok');
+      warningHtml: `This client (${escapeHtml(c.clientId)} — ${escapeHtml(c.clientName)}) has ${stats.apps.length} associated application(s) and ${stats.allotted.length + stats.sold.length} completed transaction(s). Deleting it permanently removes all of this. This cannot be undone.`,
+      onDelete: async () => {
+        await delRec('clients', id);
+        S.clients = S.clients.filter(x => x.id !== id);
+        await audit('Client Deletion','Client', c.clientId, c, null);
+        toast('Client deleted','ok');
         navigate('clients');
       }
     });
@@ -1146,14 +1140,14 @@ function deleteBank(id){
   const stats = bankStats(id);
   if (stats.plans.length || stats.apps.length){
     confirmDangerousDelete({
-      warningHtml: `This bank account (${escapeHtml(b.bankId)} — ${escapeHtml(b.bankName)}) has ${stats.plans.length} planned entr(y/ies) and ${stats.apps.length} application(s) on record. Deleting it may affect historical reporting.`,
-      onDeactivate: async () => {
-        const updated = { ...b, status:'Inactive', updatedAt: new Date().toISOString() };
-        await putRec('bankAccounts', updated);
-        Object.assign(b, updated);
-        await audit('Bank Account Deactivated','BankAccount', b.bankId, b, updated);
-        toast('Bank account deactivated — historical records kept intact','ok');
-        navigate('banks');
+      warningHtml: `This bank account (${escapeHtml(b.bankId)} — ${escapeHtml(b.bankName)}) has ${stats.plans.length} planned entr(y/ies) and ${stats.apps.length} application(s) on record. Deleting it permanently removes all of this. This cannot be undone.`,
+      onDelete: async () => {
+        await delRec('bankAccounts', id);
+        S.bankAccounts = S.bankAccounts.filter(x=>x.id!==id);
+        for (const u of bankUpis(id)){ await delRec('bankUpiIds', u.id); }
+        S.bankUpiIds = S.bankUpiIds.filter(x=>x.bankAccountId!==id);
+        await audit('Bank Account Deletion','BankAccount', b.bankId, b, null);
+        toast('Bank account deleted','ok'); navigate('banks');
       }
     });
     return;
@@ -1358,13 +1352,16 @@ function deleteIpo(id){
   const stats = ipoStats(id);
   if (stats.plans.length || stats.apps.length){
     confirmDangerousDelete({
-      warningHtml: `This IPO (${escapeHtml(i.ipoId)} — ${escapeHtml(i.ipoName)}) has ${stats.plans.length} planning record(s), ${stats.apps.length} application(s), and ${fmtMoney(stats.profit)} in recorded profit. Deleting it permanently removes all of this. This cannot be undone.`,
-      onDeactivate: async () => {
-        const updated = { ...i, archiveStatus:'Inactive', updatedAt: new Date().toISOString() };
-        await putRec('ipos', updated);
-        Object.assign(i, updated);
-        await audit('IPO Deactivated','IPO', i.ipoId, i, updated);
-        toast('IPO deactivated — historical records kept intact','ok');
+      warningHtml: `This IPO (${escapeHtml(i.ipoId)} — ${escapeHtml(i.ipoName)}) has ${stats.plans.length} planning record(s), ${stats.apps.length} application(s), and ${fmtMoney(stats.profit)} in recorded profit. Deleting it permanently removes all of this, including those planning records and applications. This cannot be undone.`,
+      onDelete: async () => {
+        for (const p of stats.plans){ await delRec('ipoPlans', p.id); }
+        S.ipoPlans = S.ipoPlans.filter(p=>p.ipoId!==id);
+        for (const a of stats.apps){ await delRec('applications', a.id); }
+        S.applications = S.applications.filter(a=>a.ipoId!==id);
+        await delRec('ipos', id);
+        S.ipos = S.ipos.filter(x=>x.id!==id);
+        await audit('IPO Deletion','IPO', i.ipoId, i, null);
+        toast('IPO and its records deleted','ok');
         navigate('ipos');
       }
     });
