@@ -2835,6 +2835,20 @@ function viewSettings(){
   </div>
 
   <div class="section-card">
+    <div class="sc-head"><h3>Bulk Import from Excel</h3></div>
+    <div class="sc-body">
+      <p class="small-muted">Feed in historical data from previous months/years without entering it one by one. Download the template, fill it in, and import — you'll see exactly what will be created before anything is saved.</p>
+      <div class="btn-row" style="justify-content:flex-start;">
+        <button class="btn btn-ghost" onclick="downloadImportTemplate()">Download Excel Template</button>
+        <label class="btn btn-primary" style="display:inline-block;">Import Filled-In Template
+          <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importFromExcel(this.files[0])">
+        </label>
+      </div>
+      <p class="small-muted" style="margin-top:10px;">Clients, Bank Accounts, and UPI IDs mentioned in your Applications sheet are created automatically by name if they don't already exist — no separate setup needed. IPOs can be listed in their own sheet or matched by name if already in the portal.</p>
+    </div>
+  </div>
+
+  <div class="section-card">
     <div class="sc-head"><h3>Local Backup</h3></div>
     <div class="sc-body">
       <p class="small-muted">Works fully offline — export/import a JSON snapshot of the entire database without Google Drive.</p>
@@ -2933,6 +2947,242 @@ function exportAllToExcel(){
   toast('Excel export downloaded','ok');
 }
 
+/* =================== EXCEL BULK IMPORT =================== */
+/* Design note: "Applications", "Allotment", "Sale", and "Recovery" are NOT separate
+   entities in this app — they're all fields on one Application record (see
+   saveApplication/saveAllotmentSale). So the import uses ONE "Applications" sheet
+   covering the full lifecycle per row, matching how the app actually stores data,
+   rather than three sheets that would need to be stitched back together.
+   Allotment Date is deliberately NOT a column here — it's hard-locked to the IPO's
+   own Allotment Date everywhere else in the app, so the import pulls it from the
+   matched IPO automatically instead of asking for it per row. */
+
+function downloadImportTemplate(){
+  const wb = XLSX.utils.book_new();
+
+  const instructions = [
+    { 'Sheet':'IPOs', 'What to fill in':'One row per IPO. If an IPO with the same name already exists in the portal, its dates/amount will be updated rather than duplicated.' },
+    { 'Sheet':'Applications', 'What to fill in':'One row per application (covers application + allotment + sale + recovery together). Client, Bank, and UPI are created automatically if they do not already exist by that exact name — you do not need to set them up first.' },
+    { 'Sheet':'', 'What to fill in':'' },
+    { 'Sheet':'Dates', 'What to fill in':'Use YYYY-MM-DD (e.g. 2026-08-15), or format the Excel cell as a Date. Leave blank if not yet known — e.g. Sale Date blank if not yet sold.' },
+    { 'Sheet':'Allotment Status', 'What to fill in':'Exactly one of: Pending, Allotted, Not Allotted' },
+    { 'Sheet':'Sale Status', 'What to fill in':'Exactly one of: Pending to Sell, Sold' },
+    { 'Sheet':'Recovery Status', 'What to fill in':'Exactly one of: Receivable, Received' },
+    { 'Sheet':'Amounts', 'What to fill in':'Plain numbers, no currency symbol or commas (e.g. 14760, not ₹14,760).' },
+    { 'Sheet':'Gross Received', 'What to fill in':'Optional. If left blank, the portal calculates it automatically the same way it does for manual entries. Fill it in only if you want to record a specific historical value (e.g. it becomes a Manual Override, same as editing it by hand later).' },
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(instructions), 'Instructions');
+
+  const iposExample = [{ 'IPO Name':'Sunshine (example — delete this row)', 'Min Amount':14760, 'Open Date':'2026-08-18', 'Close Date':'2026-08-20', 'Allotment Date':'2026-08-25' }];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(iposExample), 'IPOs');
+
+  const appsExample = [{
+    'Client Name':'Karan Mehta (example — delete this row)', 'IPO':'Sunshine', 'Bank':'HDFC', 'UPI ID':'karan@okhdfcbank',
+    'Application Date':'2026-08-18', 'Amount Applied':14760,
+    'Allotment Status':'Allotted', 'Sale Status':'Sold', 'Sale Date':'2026-08-27', 'Sale Amount':15200,
+    'Recovery Status':'Received', 'Gross Received':''
+  }];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(appsExample), 'Applications');
+
+  XLSX.writeFile(wb, 'IPO_Portal_Import_Template.xlsx');
+  toast('Template downloaded — fill it in and use Import below','ok');
+}
+
+function parseExcelDate(val){
+  if (val===null || val===undefined || val==='') return null;
+  if (val instanceof Date) return isNaN(val) ? null : isoDate(val);
+  const s = String(val).trim();
+  // dd/mm/yyyy or dd-mm-yyyy (common in India) as well as plain ISO yyyy-mm-dd
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) return isoDate(new Date(Number(dmy[3]), Number(dmy[2])-1, Number(dmy[1])));
+  const d = isoDate(s);
+  return d || null;
+}
+function normalizeStatus(val, allowed){
+  const s = (val||'').toString().trim();
+  const hit = allowed.find(a => a.toLowerCase() === s.toLowerCase());
+  return hit || null;
+}
+
+let __pendingImport = null;
+function importFromExcel(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let wb;
+    try { wb = XLSX.read(e.target.result, { type:'array', cellDates:true }); }
+    catch(err){ toast('Could not read this file — make sure it\'s a valid .xlsx file','danger'); return; }
+
+    const ipoRows = wb.Sheets['IPOs'] ? XLSX.utils.sheet_to_json(wb.Sheets['IPOs'], { defval:'' }) : [];
+    const appRows = wb.Sheets['Applications'] ? XLSX.utils.sheet_to_json(wb.Sheets['Applications'], { defval:'' }) : [];
+
+    const plan = { newIpos:[], updatedIpos:[], newClients:new Set(), newBanks:new Set(), newUpis:[], newApps:[], errors:[], skippedDupes:0 };
+
+    // ---- IPOs sheet: create new, or update dates/amount on existing (matched by name) ----
+    ipoRows.forEach((row, idx) => {
+      const name = (row['IPO Name']||'').toString().trim();
+      if (!name || /example — delete/i.test(name)) return;
+      const openDate = parseExcelDate(row['Open Date']);
+      const closeDate = parseExcelDate(row['Close Date']);
+      const allotmentDate = parseExcelDate(row['Allotment Date']);
+      const minAmount = Number(row['Min Amount']) || 0;
+      const existing = S.ipos.find(i => i.ipoName.toLowerCase() === name.toLowerCase());
+      if (existing) plan.updatedIpos.push({ existing, name, minAmount, openDate, closeDate, allotmentDate });
+      else plan.newIpos.push({ name, minAmount, openDate, closeDate, allotmentDate });
+    });
+
+    // ---- Applications sheet: auto-create Client/Bank/UPI by name, match IPO by name ----
+    appRows.forEach((row, idx) => {
+      const rowNum = idx + 2; // +2: header row + 1-indexing, matches what the user sees in Excel
+      const clientName = (row['Client Name']||'').toString().trim();
+      const ipoName = (row['IPO']||'').toString().trim();
+      const bankName = (row['Bank']||'').toString().trim();
+      if (!clientName || /example — delete/i.test(clientName)) return;
+      if (!ipoName || !bankName){ plan.errors.push(`Row ${rowNum}: missing IPO or Bank name — skipped.`); return; }
+
+      const amountApplied = Number(row['Amount Applied']) || 0;
+      if (amountApplied <= 0){ plan.errors.push(`Row ${rowNum} (${clientName}): Amount Applied must be a positive number — skipped.`); return; }
+
+      const applicationDate = parseExcelDate(row['Application Date']);
+      if (!applicationDate){ plan.errors.push(`Row ${rowNum} (${clientName}): missing or invalid Application Date — skipped.`); return; }
+
+      const allotmentStatus = normalizeStatus(row['Allotment Status'], ALLOTMENT_STATUSES) || 'Pending';
+      const saleStatus = row['Sale Status'] ? normalizeStatus(row['Sale Status'], SALE_STATUSES) : null;
+      if (row['Sale Status'] && !saleStatus){ plan.errors.push(`Row ${rowNum} (${clientName}): Sale Status "${row['Sale Status']}" not recognized — must be exactly "Pending to Sell" or "Sold". Left blank.`); }
+      const recoveryStatus = row['Recovery Status'] ? normalizeStatus(row['Recovery Status'], RECEIVE_STATUSES) : null;
+      if (row['Recovery Status'] && !recoveryStatus){ plan.errors.push(`Row ${rowNum} (${clientName}): Recovery Status "${row['Recovery Status']}" not recognized — must be exactly "Receivable" or "Received". Left blank.`); }
+      const saleDate = parseExcelDate(row['Sale Date']);
+      const saleAmount = row['Sale Amount']!=='' ? Number(row['Sale Amount'])||0 : null;
+      const grossReceived = row['Gross Received']!=='' && row['Gross Received']!=null ? Number(row['Gross Received'])||0 : null;
+
+      // duplicate check against records already in the portal (same rule the manual form uses)
+      const existingClient = S.clients.find(c=>c.clientName.toLowerCase()===clientName.toLowerCase());
+      const existingBank = S.bankAccounts.find(b=>b.bankName.toLowerCase()===bankName.toLowerCase());
+      const matchedNewIpo = plan.newIpos.find(i=>i.name.toLowerCase()===ipoName.toLowerCase());
+      const existingIpo = S.ipos.find(i=>i.ipoName.toLowerCase()===ipoName.toLowerCase());
+      if (existingClient && existingBank && (existingIpo||matchedNewIpo)){
+        const ipoRef = existingIpo ? existingIpo.id : ('NEW:'+ipoName.toLowerCase());
+        const dupe = S.applications.find(a => a.clientId===existingClient.id && String(a.ipoId)===String(ipoRef) && a.bankAccountId===existingBank.id) ||
+                     plan.newApps.find(a => a._clientKey===clientName.toLowerCase() && a._ipoKey===ipoName.toLowerCase() && a._bankKey===bankName.toLowerCase());
+        if (dupe){ plan.skippedDupes++; return; }
+      }
+      if (!existingClient) plan.newClients.add(clientName);
+      if (!existingBank) plan.newBanks.add(bankName);
+      const upiId = (row['UPI ID']||'').toString().trim();
+      if (upiId && existingBank && !bankUpis(existingBank.id).some(u=>u.upiId.toLowerCase()===upiId.toLowerCase())){
+        plan.newUpis.push({ bankName, upiId });
+      }
+
+      plan.newApps.push({
+        _clientKey:clientName.toLowerCase(), _ipoKey:ipoName.toLowerCase(), _bankKey:bankName.toLowerCase(),
+        clientName, ipoName, bankName, upiId, applicationDate, amountApplied,
+        allotmentStatus, saleStatus, saleDate, saleAmount, recoveryStatus, grossReceived, rowNum
+      });
+    });
+
+    __pendingImport = plan;
+    showImportPreview(plan);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showImportPreview(plan){
+  const summary = `
+    <div class="kpi-grid" style="margin-bottom:14px;">
+      <div class="kpi-card"><div class="lbl">New IPOs</div><div class="val">${plan.newIpos.length}</div></div>
+      <div class="kpi-card"><div class="lbl">IPOs to Update</div><div class="val">${plan.updatedIpos.length}</div></div>
+      <div class="kpi-card"><div class="lbl">New Clients</div><div class="val">${plan.newClients.size}</div></div>
+      <div class="kpi-card"><div class="lbl">New Banks</div><div class="val">${plan.newBanks.size}</div></div>
+      <div class="kpi-card"><div class="lbl">New UPI IDs</div><div class="val">${plan.newUpis.length}</div></div>
+      <div class="kpi-card"><div class="lbl">Applications to Import</div><div class="val ok">${plan.newApps.length}</div></div>
+      <div class="kpi-card"><div class="lbl">Duplicates Skipped</div><div class="val">${plan.skippedDupes}</div></div>
+      <div class="kpi-card"><div class="lbl">Rows With Errors</div><div class="val ${plan.errors.length?'danger':''}">${plan.errors.length}</div></div>
+    </div>`;
+  const errorList = plan.errors.length ? `<div class="small-muted" style="max-height:160px;overflow-y:auto;border-top:1px solid var(--border);padding-top:10px;">${plan.errors.map(e=>escapeHtml(e)).join('<br>')}</div>` : '';
+  openModal('Review Import Before Committing',
+    `<p style="font-size:13px;">Nothing has been imported yet. Review the counts below, then confirm.</p>${summary}${errorList}`,
+    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="commitImport()">Import ${plan.newApps.length} Application${plan.newApps.length===1?'':'s'}</button>`);
+}
+
+async function commitImport(){
+  const plan = __pendingImport;
+  if (!plan) return;
+  closeModal();
+
+  // 1) IPOs — create new, update existing
+  for (const ni of plan.newIpos){
+    const ipoId = nextCode(S.ipos, 'ipoId', 'IPO');
+    const rec = { ipoId, ipoName:ni.name, minimumApplicationAmount:ni.minAmount, openDate:ni.openDate, closeDate:ni.closeDate, allotmentDate:ni.allotmentDate, archiveStatus:'Active', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const newId = await putRec('ipos', rec); rec.id = newId; S.ipos.push(rec);
+    await audit('IPO Imported','IPO', ipoId, null, rec);
+  }
+  for (const ui of plan.updatedIpos){
+    const updated = { ...ui.existing, minimumApplicationAmount:ui.minAmount||ui.existing.minimumApplicationAmount, openDate:ui.openDate||ui.existing.openDate, closeDate:ui.closeDate||ui.existing.closeDate, allotmentDate:ui.allotmentDate||ui.existing.allotmentDate, updatedAt:new Date().toISOString() };
+    await putRec('ipos', updated); Object.assign(ui.existing, updated);
+    await audit('IPO Updated via Import','IPO', ui.existing.ipoId, ui.existing, updated);
+  }
+
+  // 2) Clients — auto-create by name
+  const clientByName = {};
+  S.clients.forEach(c => clientByName[c.clientName.toLowerCase()] = c);
+  for (const name of plan.newClients){
+    const clientId = nextCode(S.clients, 'clientId', 'CL');
+    const rec = { clientId, clientName:name, referenceName:'', subReference:'', status:'Active', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const newId = await putRec('clients', rec); rec.id = newId; S.clients.push(rec);
+    clientByName[name.toLowerCase()] = rec;
+    await audit('Client Imported','Client', clientId, null, rec);
+  }
+
+  // 3) Banks — auto-create by name
+  const bankByName = {};
+  S.bankAccounts.forEach(b => bankByName[b.bankName.toLowerCase()] = b);
+  for (const name of plan.newBanks){
+    const bankId = nextCode(S.bankAccounts, 'bankId', 'BANK');
+    const rec = { bankId, bankName:name, accountHolderName:'', status:'Active', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const newId = await putRec('bankAccounts', rec); rec.id = newId; S.bankAccounts.push(rec);
+    bankByName[name.toLowerCase()] = rec;
+    await audit('Bank Account Imported','BankAccount', bankId, null, rec);
+  }
+
+  // 4) UPI IDs — auto-create under the matched bank
+  for (const nu of plan.newUpis){
+    const bank = bankByName[nu.bankName.toLowerCase()];
+    if (!bank) continue;
+    const rec = { bankAccountId:bank.id, upiId:nu.upiId, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    const newId = await putRec('bankUpiIds', rec); rec.id = newId; S.bankUpiIds.push(rec);
+  }
+
+  // 5) Applications — build final records, resolving IPO/Client/Bank/UPI by name
+  const ipoByName = {}; S.ipos.forEach(i => ipoByName[i.ipoName.toLowerCase()] = i);
+  for (const na of plan.newApps){
+    const client = clientByName[na._clientKey];
+    const bank = bankByName[na._bankKey];
+    const ipo = ipoByName[na._ipoKey];
+    if (!client || !bank || !ipo) continue; // shouldn't happen — already validated in the preview step
+    const upi = na.upiId ? bankUpis(bank.id).find(u=>u.upiId.toLowerCase()===na.upiId.toLowerCase()) : null;
+    const rec = {
+      clientId:client.id, ipoId:ipo.id, bankAccountId:bank.id, upiId: upi?upi.id:null,
+      applicationDate:na.applicationDate, amountApplied:na.amountApplied, applicationStatus:'Applied', planId:null,
+      allotmentStatus:na.allotmentStatus, allotmentDate: ipo.allotmentDate || null,
+      saleStatus:na.saleStatus, saleDate:na.saleDate, saleAmount:na.saleAmount,
+      calculatedGrossReceived:null, grossReceived:na.grossReceived, grossReceivedOverridden: na.grossReceived!=null,
+      calculatedOurProfit:null, ourProfit:null, ourProfitOverridden:false,
+      calculatedClientProfit:null, clientProfit:null, clientProfitOverridden:false,
+      amountReceiveStatus:na.recoveryStatus,
+      overrideReason: na.grossReceived!=null ? 'Set via Excel import' : null,
+      overrideChangedAt: na.grossReceived!=null ? new Date().toISOString() : null,
+      createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+    };
+    const newId = await putRec('applications', rec); rec.id = newId; S.applications.push(rec);
+  }
+  await audit('Bulk Import','Applications', null, null, { count: plan.newApps.length });
+
+  __pendingImport = null;
+  toast(`Imported ${plan.newApps.length} application(s)`,'ok');
+  if (typeof scheduleSync === 'function') scheduleSync();
+  navigate('dashboard');
+}
+
 /* =================== LOCAL BACKUP (JSON) =================== */
 function snapshotData(){
   return {
@@ -2963,19 +3213,33 @@ async function restoreSnapshot(data){
 }
 function localBackupRestore(file){
   if (!file) return;
-  confirmAction('Restoring will replace all current data with the contents of this backup file. Continue?', () => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let data;
+    try { data = JSON.parse(e.target.result); }
+    catch(err){ toast('Invalid backup file — not valid JSON','danger'); return; }
+    const counts = ['clients','bankAccounts','ipos','ipoPlans','applications'].map(k =>
+      `${(data[k]||[]).length} ${k}`).join(', ');
+    openModal('Restore Backup?',
+      `<p style="font-size:13px;line-height:1.6;">
+         <b>&#9888; Restoring this backup may replace current portal data.</b><br><br>
+         <b>Backup date:</b> ${data.exportedAt ? fmtDate(data.exportedAt) : 'Unknown'}<br>
+         <b>Data version:</b> ${data.version ?? 'Unknown'}<br>
+         <b>Contains:</b> ${counts || 'No records found'}
+       </p>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+       <button class="btn btn-danger" id="confirmRestoreBtn">Restore This Backup</button>`);
+    document.getElementById('confirmRestoreBtn').onclick = async () => {
+      closeModal();
       try {
-        const data = JSON.parse(e.target.result);
         await restoreSnapshot(data);
         await saveSetting('lastRestore', new Date().toISOString());
         toast('Backup restored','ok');
         navigate('dashboard');
-      } catch(err){ toast('Invalid backup file','danger'); }
+      } catch(err){ toast('Restore failed: ' + (err.message||err),'danger'); }
     };
-    reader.readAsText(file);
-  });
+  };
+  reader.readAsText(file);
 }
 
 /* =================== GOOGLE DRIVE — SOURCE OF TRUTH, INDEXEDDB AS LOCAL CACHE =================== */
