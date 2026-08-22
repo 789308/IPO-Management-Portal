@@ -2988,15 +2988,26 @@ function downloadImportTemplate(){
   toast('Template downloaded — fill it in and use Import below','ok');
 }
 
+function dateToIsoUTC(d){
+  // Read the calendar date using UTC getters, matching how SheetJS constructs
+  // date cells internally. Using local getters (or toISOString on a
+  // locally-constructed Date) silently shifts the date back one day for
+  // anyone in a timezone ahead of UTC — e.g. India (UTC+5:30) — which is
+  // exactly the "sale date shows 1 day ago" bug.
+  const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function parseExcelDate(val){
   if (val===null || val===undefined || val==='') return null;
-  if (val instanceof Date) return isNaN(val) ? null : isoDate(val);
+  if (val instanceof Date) return isNaN(val) ? null : dateToIsoUTC(val);
   const s = String(val).trim();
-  // dd/mm/yyyy or dd-mm-yyyy (common in India) as well as plain ISO yyyy-mm-dd
+  // dd/mm/yyyy or dd-mm-yyyy (common in India) — construct in UTC, not local time
   const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) return isoDate(new Date(Number(dmy[3]), Number(dmy[2])-1, Number(dmy[1])));
-  const d = isoDate(s);
-  return d || null;
+  if (dmy) return dateToIsoUTC(new Date(Date.UTC(Number(dmy[3]), Number(dmy[2])-1, Number(dmy[1]))));
+  // yyyy-mm-dd — extract directly rather than round-tripping through Date parsing
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${String(iso[2]).padStart(2,'0')}-${String(iso[3]).padStart(2,'0')}`;
+  return null;
 }
 function normalizeStatus(val, allowed){
   const s = (val||'').toString().trim();
